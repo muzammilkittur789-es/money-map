@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '94%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 34,
   },
   notch: {
     width: 40,
@@ -638,6 +638,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 14 : 12,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },

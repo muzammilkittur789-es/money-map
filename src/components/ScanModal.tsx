@@ -9,7 +9,9 @@ import {
   StatusBar,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { parseUpiQr } from '../utils/upi';
@@ -22,12 +24,19 @@ interface ScanModalProps {
 }
 
 export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSuccess }) => {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [manualUpi, setManualUpi] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [torch, setTorch] = useState(false);
   const lastScannedTime = useRef(0);
+
+  // Safe area padding calculations to prevent colliding with notification bar and nav bar
+  const topHeaderPadding =
+    Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 20) + 12;
+  const bottomFooterPadding =
+    Math.max(insets.bottom, Platform.OS === 'android' ? 28 : 16) + 16;
 
   // Re-arm camera and reset scanning state every time modal opens or closes
   useEffect(() => {
@@ -105,8 +114,8 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header (Brought down safely below upper notification bar) */}
+        <View style={[styles.header, { paddingTop: topHeaderPadding, paddingBottom: 16 }]}>
           <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
             <Ionicons name="close" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -166,8 +175,8 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
           </View>
         )}
 
-        {/* Footer Controls */}
-        <View style={styles.footer}>
+        {/* Footer Controls (Brought up safely above lower navigation bar) */}
+        <View style={[styles.footer, { paddingBottom: bottomFooterPadding }]}>
           {showManualInput ? (
             <View style={styles.manualInputGroup}>
               <TextInput

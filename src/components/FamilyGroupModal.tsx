@@ -10,6 +10,7 @@ import {
   Alert,
   Share,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -997,7 +998,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               </View>
             )}
 
-            <View style={{ height: 60 }} />
+            <View style={{ height: 85 }} />
           </ScrollView>
         </View>
       </View>
@@ -1016,7 +1017,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '90%',
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 34,
   },
   notch: {
     width: 40,

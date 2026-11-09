@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -48,6 +50,10 @@ import { InflowSavingsView } from '../components/InflowSavingsView';
 import { ReceiptScannerModal } from '../components/ReceiptScannerModal';
 
 export const HomeScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 18 : 10) + 4;
+  const dockBottom = Math.max(108, insets.bottom + 92);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('EXPENSES');
@@ -392,7 +398,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={{ height: 190 }} />
+          <View style={{ height: 250 }} />
         </ScrollView>
       ) : (
         <InflowSavingsView
@@ -409,7 +415,7 @@ export const HomeScreen: React.FC = () => {
 
       {/* Floating Action Dock for Expenses Tab */}
       {activeTab === 'EXPENSES' ? (
-        <View style={styles.actionDock}>
+        <View style={[styles.actionDock, { bottom: dockBottom }]}>
           <TouchableOpacity
             style={styles.dockButtonSecondary}
             onPress={handleOpenCashEntry}
@@ -438,7 +444,7 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.actionDock}>
+        <View style={[styles.actionDock, { bottom: dockBottom }]}>
           <TouchableOpacity
             style={[styles.dockButtonPrimary, { backgroundColor: '#16A34A' }]}
             onPress={() => setAddInflowVisible(true)}
@@ -451,7 +457,7 @@ export const HomeScreen: React.FC = () => {
       )}
 
       {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { paddingBottom: bottomNavPadding }]}>
         <TouchableOpacity
           style={[styles.navTab, activeTab === 'EXPENSES' && styles.navTabActive]}
           onPress={() => setActiveTab('EXPENSES')}
