@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { InflowItem } from '../types';
 import { getInflowCategoryMeta } from '../utils/inflowCategories';
+import { MemberAvatar } from './MemberAvatar';
 
 interface InflowCardProps {
   inflow: InflowItem;
@@ -81,7 +82,7 @@ export const InflowCard: React.FC<InflowCardProps> = ({ inflow, onDelete }) => {
 
         {/* Recipient */}
         <View style={styles.spenderRow}>
-          <Text style={styles.spenderEmoji}>{inflow.receivedBy?.avatar || '👤'}</Text>
+          <MemberAvatar size={16} />
           <Text style={styles.spenderText}>
             Received by <Text style={styles.spenderName}>{inflow.receivedBy?.name || 'You'}</Text>
           </Text>

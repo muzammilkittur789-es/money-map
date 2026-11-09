@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Expense } from '../types';
 import { getCategoryMeta } from '../utils/categories';
+import { MemberAvatar } from './MemberAvatar';
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -85,7 +86,7 @@ export const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onDelete }) =
 
         {/* Spender Info */}
         <View style={styles.spenderRow}>
-          <Text style={styles.spenderEmoji}>{expense.spentBy?.avatar || '👤'}</Text>
+          <MemberAvatar size={16} />
           <Text style={styles.spenderText}>
             Paid by <Text style={styles.spenderName}>{expense.spentBy?.name || 'You'}</Text>
           </Text>

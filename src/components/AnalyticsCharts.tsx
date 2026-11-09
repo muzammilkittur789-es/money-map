@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Expense, ExpenseScope, FamilyMember } from '../types';
 import { getCategoryMeta } from '../utils/categories';
+import { MemberAvatar } from './MemberAvatar';
 
 interface AnalyticsChartsProps {
   expenses: Expense[];
@@ -103,9 +104,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
               const pct = totalAmount > 0 ? Math.round((total / totalAmount) * 100) : 0;
               return (
                 <View key={member.id} style={styles.memberRow}>
-                  <View style={styles.memberAvatarCircle}>
-                    <Text style={styles.avatarEmoji}>{member.avatar}</Text>
-                  </View>
+                  <MemberAvatar size={34} />
 
                   <View style={styles.memberDetails}>
                     <View style={styles.memberNameRow}>

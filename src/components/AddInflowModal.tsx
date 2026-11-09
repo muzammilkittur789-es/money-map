@@ -20,6 +20,7 @@ import {
   InflowItem,
 } from '../types';
 import { INFLOW_CATEGORIES } from '../utils/inflowCategories';
+import { MemberAvatar } from './MemberAvatar';
 
 interface AddInflowModalProps {
   visible: boolean;
@@ -295,7 +296,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
                         ]}
                         onPress={() => setSelectedRecipient(member)}
                       >
-                        <Text style={styles.spenderPillEmoji}>{member.avatar}</Text>
+                        <MemberAvatar size={20} style={{ marginRight: 6 }} />
                         <Text
                           style={[
                             styles.spenderPillText,

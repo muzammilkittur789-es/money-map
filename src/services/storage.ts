@@ -13,7 +13,7 @@ const STORAGE_KEYS = {
   INFLOWS: '@family_expense_tracker/inflows',
   FAMILY_GROUP: '@family_expense_tracker/family_group',
   USER_PROFILE: '@family_expense_tracker/user_profile',
-  INITIALIZED: '@family_expense_tracker/initialized_v4_clean_slate',
+  INITIALIZED: '@family_expense_tracker/initialized_v5_profile_avatar',
 };
 
 export const CURRENT_USER: FamilyMember = {

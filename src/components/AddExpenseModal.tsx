@@ -23,6 +23,7 @@ import {
 } from '../types';
 import { CATEGORIES } from '../utils/categories';
 import { launchPaymentApp } from '../utils/upi';
+import { MemberAvatar } from './MemberAvatar';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -390,7 +391,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                         ]}
                         onPress={() => setSelectedSpender(member)}
                       >
-                        <Text style={styles.spenderPillEmoji}>{member.avatar}</Text>
+                        <MemberAvatar size={20} style={{ marginRight: 6 }} />
                         <Text
                           style={[
                             styles.spenderPillText,

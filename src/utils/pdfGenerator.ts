@@ -261,7 +261,7 @@ export async function generateAndSharePdfReport({
                     .map(
                       (m) => `
                     <tr>
-                      <td>${m.avatar} ${m.name}</td>
+                      <td><span style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#94A3B8; text-align:center; line-height:18px; color:white; font-size:10px; margin-right:6px;">👤</span>${m.name}</td>
                       <td class="amount-col">₹${m.total.toLocaleString('en-IN')}</td>
                     </tr>
                   `

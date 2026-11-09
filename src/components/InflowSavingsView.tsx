@@ -24,12 +24,38 @@ export const InflowSavingsView: React.FC<InflowSavingsViewProps> = ({
   onDeleteInflow,
   onOpenAddInflow,
 }) => {
+  const hasTransactions = totalInflow > 0 || totalExpense > 0;
   const netSaved = totalInflow - totalExpense;
   const isSurplus = netSaved >= 0;
+
+  let spentPercent = 0;
+  let savedPercent = 0;
+
+  if (!hasTransactions) {
+    // Initially neutral grey: no red or green fill
+    spentPercent = 0;
+    savedPercent = 0;
+  } else if (totalInflow === 0 && totalExpense > 0) {
+    // Only debited: fills red
+    spentPercent = 100;
+    savedPercent = 0;
+  } else if (totalInflow > 0 && totalExpense === 0) {
+    // Only credited: fills green
+    spentPercent = 0;
+    savedPercent = 100;
+  } else {
+    // Both debits and credits exist
+    if (totalExpense >= totalInflow) {
+      spentPercent = 100;
+      savedPercent = 0;
+    } else {
+      spentPercent = Math.min(100, Math.round((totalExpense / totalInflow) * 100));
+      savedPercent = Math.max(0, 100 - spentPercent);
+    }
+  }
+
   const savingsRate =
     totalInflow > 0 ? Math.max(0, Math.round((netSaved / totalInflow) * 100)) : 0;
-  const expenseProportion =
-    totalInflow > 0 ? Math.min(100, Math.round((totalExpense / totalInflow) * 100)) : 100;
 
   const bankAmount = inflows
     .filter((i) => i.channel === 'BANK_UPI')
@@ -67,41 +93,65 @@ export const InflowSavingsView: React.FC<InflowSavingsViewProps> = ({
 
         {/* Big Net Saved Number */}
         <View style={styles.netSavedRow}>
-          <Text style={[styles.netSavedAmount, !isSurplus && styles.netDeficitAmount]}>
-            {isSurplus ? '+' : '-'}₹{Math.abs(netSaved).toLocaleString('en-IN')}
+          <Text
+            style={[
+              styles.netSavedAmount,
+              !hasTransactions
+                ? styles.netZeroAmount
+                : !isSurplus
+                ? styles.netDeficitAmount
+                : undefined,
+            ]}
+          >
+            {!hasTransactions
+              ? '₹0'
+              : `${isSurplus ? '+' : '-'}₹${Math.abs(netSaved).toLocaleString('en-IN')}`}
           </Text>
-          <View style={[styles.rateBadge, isSurplus ? styles.rateBadgePositive : styles.rateBadgeDeficit]}>
-            <Ionicons
-              name={isSurplus ? 'trending-up' : 'trending-down'}
-              size={12}
-              color={isSurplus ? '#10B981' : '#EF4444'}
-            />
-            <Text style={[styles.rateBadgeText, isSurplus ? styles.rateTextPositive : styles.rateTextDeficit]}>
-              {savingsRate}% Saved
-            </Text>
-          </View>
+          {!hasTransactions ? (
+            <View style={[styles.rateBadge, styles.rateBadgeNeutral]}>
+              <Ionicons name="sparkles-outline" size={12} color="#94A3B8" />
+              <Text style={[styles.rateBadgeText, { color: '#94A3B8' }]}>Clean Slate</Text>
+            </View>
+          ) : (
+            <View style={[styles.rateBadge, isSurplus ? styles.rateBadgePositive : styles.rateBadgeDeficit]}>
+              <Ionicons
+                name={isSurplus ? 'trending-up' : 'trending-down'}
+                size={12}
+                color={isSurplus ? '#10B981' : '#EF4444'}
+              />
+              <Text style={[styles.rateBadgeText, isSurplus ? styles.rateTextPositive : styles.rateTextDeficit]}>
+                {savingsRate}% Saved
+              </Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.heroSubText}>
-          {isSurplus
+          {!hasTransactions
+            ? `Your ledger is starting clean. Log money received and expenses to track your net savings this ${periodLabel.toLowerCase()}!`
+            : isSurplus
             ? `You have saved ${savingsRate}% of the total funds received this ${periodLabel.toLowerCase()}!`
             : `Expenses exceeded inflows by ₹${Math.abs(netSaved).toLocaleString('en-IN')}.`}
         </Text>
 
-        {/* Visual Inflow vs Outflow Comparison Bar */}
+        {/* Visual Inflow vs Outflow Comparison Bar (Initially 100% Grey) */}
         <View style={styles.comparisonBarBg}>
-          <View
-            style={[
-              styles.comparisonBarSpent,
-              { width: `${Math.min(100, expenseProportion)}%` },
-            ]}
-          />
-          <View
-            style={[
-              styles.comparisonBarSaved,
-              { width: `${Math.max(0, 100 - expenseProportion)}%` },
-            ]}
-          />
+          {spentPercent > 0 && (
+            <View
+              style={[
+                styles.comparisonBarSpent,
+                { width: `${spentPercent}%` },
+              ]}
+            />
+          )}
+          {savedPercent > 0 && (
+            <View
+              style={[
+                styles.comparisonBarSaved,
+                { width: `${savedPercent}%` },
+              ]}
+            />
+          )}
         </View>
 
         <View style={styles.barLegend}>
@@ -234,6 +284,9 @@ const styles = StyleSheet.create({
     color: '#10B981',
     letterSpacing: -0.5,
   },
+  netZeroAmount: {
+    color: '#F8FAFC',
+  },
   netDeficitAmount: {
     color: '#EF4444',
   },
@@ -244,6 +297,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
+  },
+  rateBadgeNeutral: {
+    backgroundColor: 'rgba(148, 163, 184, 0.15)',
   },
   rateBadgePositive: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -270,17 +326,19 @@ const styles = StyleSheet.create({
   },
   comparisonBarBg: {
     flexDirection: 'row',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#1E293B',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#334155', // Clean neutral slate grey initially
     overflow: 'hidden',
     marginBottom: 8,
   },
   comparisonBarSpent: {
-    backgroundColor: '#EF4444', // Red for expenses
+    backgroundColor: '#EF4444', // Red when debited
+    height: '100%',
   },
   comparisonBarSaved: {
-    backgroundColor: '#10B981', // Green for retained
+    backgroundColor: '#10B981', // Green when credited
+    height: '100%',
   },
   barLegend: {
     flexDirection: 'row',

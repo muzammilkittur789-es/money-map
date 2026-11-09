@@ -20,6 +20,7 @@ import {
   saveSupabaseCredentials,
 } from '../services/supabase';
 import { CURRENT_USER, clearAllExpensesAndInflows, syncAllToCloud } from '../services/storage';
+import { MemberAvatar } from './MemberAvatar';
 
 interface FamilyGroupModalProps {
   visible: boolean;
@@ -417,20 +418,12 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               {/* Add Member Form */}
               {isAddingMember && (
                 <View style={styles.addMemberBox}>
-                  <Text style={styles.addMemberSub}>Select Avatar:</Text>
-                  <View style={styles.avatarRow}>
-                    {AVATARS.map((av) => (
-                      <TouchableOpacity
-                        key={av}
-                        style={[
-                          styles.avatarSelectBtn,
-                          newMemberAvatar === av && styles.avatarSelectBtnActive,
-                        ]}
-                        onPress={() => setNewMemberAvatar(av)}
-                      >
-                        <Text style={{ fontSize: 20 }}>{av}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <MemberAvatar size={42} />
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>Member Profile</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>Uses household profile picture</Text>
+                    </View>
                   </View>
 
                   <TextInput
@@ -452,9 +445,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 {group.members.map((member) => (
                   <View key={member.id} style={styles.memberCard}>
                     <View style={styles.memberLeft}>
-                      <View style={styles.avatarBg}>
-                        <Text style={{ fontSize: 20 }}>{member.avatar}</Text>
-                      </View>
+                      <MemberAvatar size={40} />
                       <View>
                         <Text style={styles.memberName}>
                           {member.name} {member.isCurrentUser ? '(You)' : ''}
