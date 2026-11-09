@@ -17,7 +17,8 @@
       "package": "com.moneymap.app",
       "versionCode": 1,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#ECFDF5",
@@ -38,6 +39,12 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "085b61cc-743b-4f8a-ab21-b7467c5375a1"
+      }
+    },
+    "owner": "muzammil-kittur"
   }
 }
