@@ -1,23 +1,39 @@
 {
   "expo": {
-    "name": "family-expense-tracker",
-    "slug": "family-expense-tracker",
+    "name": "Money Map",
+    "slug": "money-map",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "moneymap",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera permission is needed to scan merchant UPI QR codes."
+      }
     },
     "android": {
+      "package": "com.moneymap.app",
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#ECFDF5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera permission is needed to scan merchant UPI QR codes."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
