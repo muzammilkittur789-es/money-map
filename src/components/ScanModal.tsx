@@ -100,15 +100,6 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
     }
   };
 
-  const handleSampleScan = () => {
-    // Demo merchant QR code to test easily without a physical QR
-    const demoQr = 'upi://pay?pa=kirana.store@okaxis&pn=Sharma%20Kirana%20Store&mc=5411&cu=INR';
-    const parsed = parseUpiQr(demoQr);
-    if (parsed) {
-      onScanSuccess(parsed);
-    }
-  };
-
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container}>
@@ -178,37 +169,61 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
         {/* Footer Controls (Brought up safely above lower navigation bar) */}
         <View style={[styles.footer, { paddingBottom: bottomFooterPadding }]}>
           {showManualInput ? (
-            <View style={styles.manualInputGroup}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter UPI ID (e.g. store@okhdfcbank)"
-                placeholderTextColor="#94A3B8"
-                value={manualUpi}
-                onChangeText={setManualUpi}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity style={styles.manualSubmitBtn} onPress={handleManualSubmit}>
-                <Text style={styles.manualSubmitText}>Pay & Log</Text>
-              </TouchableOpacity>
+            <View style={styles.manualInputCard}>
+              <View style={styles.manualInputRow}>
+                <Ionicons name="at" size={20} color="#10B981" style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. merchant@okhdfcbank"
+                  placeholderTextColor="#64748B"
+                  value={manualUpi}
+                  onChangeText={setManualUpi}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+                {manualUpi.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setManualUpi('')}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#64748B" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.manualButtonsRow}>
+                <TouchableOpacity
+                  style={styles.manualCancelBtn}
+                  onPress={() => {
+                    setShowManualInput(false);
+                    setManualUpi('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.manualCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.manualSubmitBtn}
+                  onPress={handleManualSubmit}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="arrow-forward-circle" size={18} color="#FFFFFF" />
+                  <Text style={styles.manualSubmitText}>Pay & Log</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <View style={styles.quickActions}>
               <TouchableOpacity
-                style={styles.actionBtn}
+                style={styles.actionBtnFull}
                 onPress={() => setShowManualInput(true)}
+                activeOpacity={0.8}
               >
-                <Ionicons name="keypad" size={18} color="#E2E8F0" />
-                <Text style={styles.actionBtnText}>Enter UPI ID</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.demoActionBtn]}
-                onPress={handleSampleScan}
-              >
-                <Ionicons name="flask" size={18} color="#34D399" />
-                <Text style={[styles.actionBtnText, { color: '#34D399' }]}>
-                  Test Demo Merchant QR
-                </Text>
+                <View style={styles.actionIconCircle}>
+                  <Ionicons name="keypad" size={17} color="#10B981" />
+                </View>
+                <Text style={styles.actionBtnFullText}>Enter Merchant UPI ID Manually</Text>
+                <Ionicons name="chevron-forward" size={16} color="#64748B" />
               </TouchableOpacity>
             </View>
           )}
@@ -341,54 +356,95 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     backgroundColor: '#0F172A',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
   quickActions: {
-    flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
   },
-  actionBtn: {
-    flex: 1,
+  actionBtnFull: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E293B',
     paddingVertical: 12,
-    borderRadius: 14,
-    gap: 8,
-  },
-  demoActionBtn: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    width: '100%',
   },
-  actionBtnText: {
-    color: '#E2E8F0',
-    fontSize: 13,
-    fontWeight: '600',
+  actionIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  manualInputGroup: {
+  actionBtnFullText: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    marginLeft: 12,
+  },
+  manualInputCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    gap: 12,
+  },
+  manualInputRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
     color: '#FFFFFF',
     fontSize: 14,
   },
-  manualSubmitBtn: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 16,
+  manualButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  manualCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  manualCancelText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  manualSubmitBtn: {
+    flex: 1.6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 6,
   },
   manualSubmitText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
   },
 });

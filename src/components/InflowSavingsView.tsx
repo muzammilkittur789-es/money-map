@@ -73,20 +73,30 @@ export const InflowSavingsView: React.FC<InflowSavingsViewProps> = ({
       {/* Hero Net Savings Card */}
       <View style={styles.heroCard}>
         <View style={styles.heroHeader}>
-          <Text style={styles.heroLabel}>Net Savings ({periodLabel})</Text>
+          <View style={styles.heroLabelContainer}>
+            <Text style={styles.heroLabel} numberOfLines={1} ellipsizeMode="tail">
+              NET SAVINGS • {periodLabel.toUpperCase()}
+            </Text>
+          </View>
           <View
             style={[
               styles.scopeBadge,
               scope === 'FAMILY' ? styles.familyBadge : styles.personalBadge,
             ]}
           >
+            <Ionicons
+              name={scope === 'FAMILY' ? 'people' : 'lock-closed'}
+              size={11}
+              color={scope === 'FAMILY' ? '#34D399' : '#94A3B8'}
+            />
             <Text
               style={[
                 styles.scopeBadgeText,
                 scope === 'FAMILY' ? styles.familyBadgeText : styles.personalBadgeText,
               ]}
+              numberOfLines={1}
             >
-              {scope === 'FAMILY' ? '👨‍👩‍👧‍👦 Family' : '👤 Private'}
+              {scope === 'FAMILY' ? 'Family Pool' : 'Personal'}
             </Text>
           </View>
         </View>
@@ -244,27 +254,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  heroLabelContainer: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
   heroLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   scopeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 12,
+    gap: 4,
+    flexShrink: 0,
   },
   personalBadge: {
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   familyBadge: {
-    backgroundColor: '#064E3B',
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.3)',
   },
   scopeBadgeText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   personalBadgeText: {
     color: '#94A3B8',

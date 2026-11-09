@@ -76,7 +76,7 @@ const DEFAULT_MEMBERS: FamilyMember[] = [
 
 export const SOLO_GROUP: FamilyGroup = {
   id: 'solo_group',
-  name: 'Personal Space (Not in Family)',
+  name: 'Personal Space',
   inviteCode: '',
   adminCode: '',
   monthlyBudget: 0,

@@ -24,25 +24,55 @@ export const Header: React.FC<HeaderProps> = ({
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top, Platform.OS === 'android' ? 38 : 20) + 8;
 
+  const isSoloOrUnlinked =
+    !familyName ||
+    familyName.includes('Personal Space') ||
+    familyName.toLowerCase().includes('not in family');
+
+  const displayedBadgeName = isSoloOrUnlinked ? 'Family Hub' : familyName;
+
+  const getSubtitle = () => {
+    if (currentScope === 'PERSONAL') {
+      return 'Private Expense Ledger';
+    }
+    if (isSoloOrUnlinked) {
+      return 'Household Shared Ledger';
+    }
+    return `${familyName} Ledger`;
+  };
+
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
       {/* Top Bar */}
       <View style={styles.topRow}>
-        <View>
+        <View style={styles.topRowLeft}>
           <Text style={styles.appTitle}>Money Map</Text>
-          <Text style={styles.subtitle}>
-            {currentScope === 'PERSONAL' ? 'Private Expense View' : `${familyName} Ledger`}
+          <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
+            {getSubtitle()}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.familyBadge}
+          style={[styles.familyBadge, isSoloOrUnlinked && styles.familyBadgePrompt]}
           onPress={onOpenFamilyModal}
           activeOpacity={0.8}
         >
-          <Ionicons name="people" size={16} color="#059669" />
-          <Text style={styles.familyBadgeText}>{familyName}</Text>
-          <Ionicons name="chevron-forward" size={14} color="#6B7280" />
+          <Ionicons
+            name={isSoloOrUnlinked ? 'people-outline' : 'people'}
+            size={15}
+            color={isSoloOrUnlinked ? '#0D9488' : '#059669'}
+          />
+          <Text
+            style={[
+              styles.familyBadgeText,
+              isSoloOrUnlinked && styles.familyBadgeTextPrompt,
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayedBadgeName}
+          </Text>
+          <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
         </TouchableOpacity>
       </View>
 
@@ -130,6 +160,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  topRowLeft: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 12,
+  },
   appTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -137,32 +172,43 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
     fontWeight: '500',
+    letterSpacing: -0.2,
   },
   familyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#A7F3D0',
-    gap: 6,
+    gap: 5,
+    maxWidth: 145,
+    flexShrink: 0,
+  },
+  familyBadgePrompt: {
+    backgroundColor: '#F0FDFA',
+    borderColor: '#99F6E4',
   },
   familyBadgeText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#065F46',
+    flexShrink: 1,
+  },
+  familyBadgeTextPrompt: {
+    color: '#0F766E',
   },
   scopeSwitcher: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
     borderRadius: 14,
-    padding: 4,
+    padding: 3,
     marginBottom: 14,
   },
   scopeTab: {
@@ -171,19 +217,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 9,
-    borderRadius: 10,
+    borderRadius: 11,
     gap: 6,
   },
   scopeTabActive: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 2,
   },
   scopeTabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#64748B',
   },
