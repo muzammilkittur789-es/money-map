@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ExpenseScope, TimeFilter } from '../types';
 
@@ -20,8 +21,11 @@ export const Header: React.FC<HeaderProps> = ({
   familyName,
   onOpenFamilyModal,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? 38 : 20) + 8;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topPadding }]}>
       {/* Top Bar */}
       <View style={styles.topRow}>
         <View>
