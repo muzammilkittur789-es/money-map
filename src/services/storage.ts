@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Expense, FamilyGroup, FamilyMember, InflowItem } from '../types';
 import {
   clearCloudFamilyRecords,
+  deleteFamilyMemberFromCloud,
   fetchCloudFamilyExpenses,
   syncExpenseToCloud,
   syncFamilyGroupToCloud,
@@ -46,7 +47,8 @@ const DEFAULT_MEMBERS: FamilyMember[] = [
 const DEFAULT_FAMILY_GROUP: FamilyGroup = {
   id: 'group_home_1',
   name: 'Our Family',
-  inviteCode: 'FAM786',
+  inviteCode: 'FAM78601',
+  adminCode: 'FAM78699',
   monthlyBudget: 35000,
   members: DEFAULT_MEMBERS,
   createdAt: new Date().toISOString(),
@@ -79,10 +81,28 @@ export async function initializeStorage(): Promise<{
     const rawExpenses = await AsyncStorage.getItem(STORAGE_KEYS.EXPENSES);
     const rawInflows = await AsyncStorage.getItem(STORAGE_KEYS.INFLOWS);
     const rawGroup = await AsyncStorage.getItem(STORAGE_KEYS.FAMILY_GROUP);
+    const rawProfile = await AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+
+    if (rawProfile) {
+      try {
+        const parsed = JSON.parse(rawProfile);
+        if (parsed.name) {
+          CURRENT_USER.name = parsed.name;
+        }
+      } catch {}
+    }
 
     const expenses: Expense[] = rawExpenses ? JSON.parse(rawExpenses) : [];
     const inflows: InflowItem[] = rawInflows ? JSON.parse(rawInflows) : [];
     const group: FamilyGroup = rawGroup ? JSON.parse(rawGroup) : DEFAULT_FAMILY_GROUP;
+
+    // Ensure 8-digit invite code starting with FAM and admin code exist
+    if (!group.adminCode) {
+      group.adminCode = 'FAM78699';
+    }
+    if (!group.inviteCode || group.inviteCode === 'FAM786' || group.inviteCode.length < 8) {
+      group.inviteCode = 'FAM78601';
+    }
 
     return { expenses, inflows, group };
   } catch (error) {
@@ -262,5 +282,49 @@ export async function addFamilyMember(member: FamilyMember): Promise<FamilyGroup
   const updatedMembers = [...group.members, member];
   const updatedGroup = { ...group, members: updatedMembers };
   await saveFamilyGroup(updatedGroup);
+  await syncFamilyGroupToCloud(updatedGroup);
+  return updatedGroup;
+}
+
+export async function deleteFamilyMember(memberId: string): Promise<FamilyGroup> {
+  const group = await getFamilyGroup();
+  const updatedMembers = group.members.filter((m) => m.id !== memberId);
+  const updatedGroup = { ...group, members: updatedMembers };
+  await saveFamilyGroup(updatedGroup);
+  await deleteFamilyMemberFromCloud(memberId);
+  return updatedGroup;
+}
+
+export async function updateCurrentUserName(newName: string): Promise<{ user: FamilyMember; group: FamilyGroup }> {
+  const trimmed = newName.trim();
+  CURRENT_USER.name = trimmed;
+  await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(CURRENT_USER));
+
+  const group = await getFamilyGroup();
+  const updatedMembers = group.members.map((m) => {
+    if (m.isCurrentUser || m.id === CURRENT_USER.id) {
+      return { ...m, name: trimmed };
+    }
+    return m;
+  });
+  const updatedGroup = { ...group, members: updatedMembers };
+  await saveFamilyGroup(updatedGroup);
+  await syncFamilyGroupToCloud(updatedGroup);
+  return { user: CURRENT_USER, group: updatedGroup };
+}
+
+export async function updateFamilyInviteCode(newCode: string): Promise<FamilyGroup> {
+  const group = await getFamilyGroup();
+  const updatedGroup = { ...group, inviteCode: newCode.trim().toUpperCase() };
+  await saveFamilyGroup(updatedGroup);
+  await syncFamilyGroupToCloud(updatedGroup);
+  return updatedGroup;
+}
+
+export async function updateFamilyAdminCode(newAdminCode: string): Promise<FamilyGroup> {
+  const group = await getFamilyGroup();
+  const updatedGroup = { ...group, adminCode: newAdminCode.trim().toUpperCase() };
+  await saveFamilyGroup(updatedGroup);
+  await syncFamilyGroupToCloud(updatedGroup);
   return updatedGroup;
 }

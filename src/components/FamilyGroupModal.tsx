@@ -19,7 +19,16 @@ import {
   joinFamilyGroupByCode,
   saveSupabaseCredentials,
 } from '../services/supabase';
-import { CURRENT_USER, clearAllExpensesAndInflows, syncAllToCloud } from '../services/storage';
+import {
+  CURRENT_USER,
+  addFamilyMember,
+  clearAllExpensesAndInflows,
+  syncAllToCloud,
+  deleteFamilyMember,
+  updateCurrentUserName,
+  updateFamilyInviteCode,
+  updateFamilyAdminCode,
+} from '../services/storage';
 import { MemberAvatar } from './MemberAvatar';
 
 interface FamilyGroupModalProps {
@@ -40,9 +49,23 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   const [groupName, setGroupName] = useState(group.name);
   const [budget, setBudget] = useState(group.monthlyBudget.toString());
   const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberAvatar, setNewMemberAvatar] = useState('👤');
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Admin permissions state
+  const [isAdmin, setIsAdmin] = useState(CURRENT_USER.role === 'HEAD');
+  const [adminCodeInput, setAdminCodeInput] = useState('');
+  const [showAdminUnlock, setShowAdminUnlock] = useState(false);
+  const [editingAdminCode, setEditingAdminCode] = useState(false);
+  const [newAdminCodeInput, setNewAdminCodeInput] = useState(group.adminCode || 'FAM78699');
+
+  // 8-Digit Invite Code editing (must start with FAM)
+  const [editingInviteCode, setEditingInviteCode] = useState(false);
+  const [newInviteCodeInput, setNewInviteCodeInput] = useState(group.inviteCode || 'FAM78601');
+
+  // Change Profile Name state (available to all members for themselves!)
+  const [editingMyName, setEditingMyName] = useState(false);
+  const [myNewName, setMyNewName] = useState(CURRENT_USER.name || 'Myself');
 
   // Cloud Sync state
   const [isCloudConnected, setIsCloudConnected] = useState(false);
@@ -85,7 +108,11 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     }
   };
 
-  const handleAddMember = () => {
+  const handleAddMember = async () => {
+    if (!isAdmin) {
+      Alert.alert('Admin Access Required', 'Only the household admin can add new members.');
+      return;
+    }
     if (!newMemberName.trim()) {
       Alert.alert('Name Required', 'Please enter a name for the family member.');
       return;
@@ -95,18 +122,112 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
       id: `user_${Date.now()}`,
       name: newMemberName.trim(),
       role: 'MEMBER',
-      avatar: newMemberAvatar,
+      avatar: 'default',
       color: '#3B82F6',
     };
 
-    const updated = {
-      ...group,
-      members: [...group.members, newMember],
-    };
-
+    const updated = await addFamilyMember(newMember);
     onUpdateGroup(updated);
     setNewMemberName('');
     setIsAddingMember(false);
+    Alert.alert('Member Added 🎉', `"${newMember.name}" has been added to the family group.`);
+  };
+
+  const handleDeleteMember = (member: FamilyMember) => {
+    if (!isAdmin) {
+      Alert.alert('Admin Access Required', 'Only the household admin can remove members.');
+      return;
+    }
+    if (member.isCurrentUser || member.role === 'HEAD') {
+      Alert.alert('Protected Account', 'The household admin profile cannot be deleted.');
+      return;
+    }
+
+    Alert.alert(
+      'Remove Family Member',
+      `Are you sure you want to remove "${member.name}" from ${group.name}? They will no longer appear in the household list.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Member',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = await deleteFamilyMember(member.id);
+            onUpdateGroup(updated);
+            Alert.alert('Member Removed', `"${member.name}" has been removed from the family group.`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveMyName = async () => {
+    if (!myNewName.trim()) {
+      Alert.alert('Name Required', 'Please enter your profile name.');
+      return;
+    }
+    const res = await updateCurrentUserName(myNewName.trim());
+    onUpdateGroup(res.group);
+    setEditingMyName(false);
+    Alert.alert('Profile Updated 👤', `Your name is now set to "${res.user.name}".`);
+  };
+
+  const handleSaveInviteCode = async () => {
+    if (!isAdmin) {
+      Alert.alert('Admin Access Required', 'Only the household admin can change the family invite code.');
+      return;
+    }
+    const code = newInviteCodeInput.trim().toUpperCase();
+    if (!code.startsWith('FAM') || code.length !== 8) {
+      Alert.alert(
+        'Invalid Invite Code',
+        'The family invite code must be exactly 8 characters and start with "FAM" (for example: FAM78601, FAM12345).'
+      );
+      return;
+    }
+    const updated = await updateFamilyInviteCode(code);
+    onUpdateGroup(updated);
+    setEditingInviteCode(false);
+    Alert.alert('Invite Code Updated 🎉', `New 8-digit invite code is: ${code}`);
+  };
+
+  const handleSaveAdminCode = async () => {
+    if (!isAdmin) return;
+    const code = newAdminCodeInput.trim().toUpperCase();
+    if (code.length < 4) {
+      Alert.alert('Invalid Admin Code', 'Admin code must be at least 4 characters long.');
+      return;
+    }
+    const updated = await updateFamilyAdminCode(code);
+    onUpdateGroup(updated);
+    setEditingAdminCode(false);
+    Alert.alert('Admin Code Updated 🛡️', `New Admin Security Code is: ${code}`);
+  };
+
+  const handleUnlockAdmin = () => {
+    const entered = adminCodeInput.trim().toUpperCase();
+    const expected = (group.adminCode || 'FAM78699').trim().toUpperCase();
+    if (entered === expected) {
+      setIsAdmin(true);
+      setShowAdminUnlock(false);
+      setAdminCodeInput('');
+      Alert.alert(
+        'Admin Access Unlocked 👑',
+        'You now have admin access to add or delete members, customize the 8-digit invite code, and configure cloud sync.'
+      );
+    } else {
+      Alert.alert('Incorrect Admin Code', 'The entered code does not match. Please verify with the household admin.');
+    }
+  };
+
+  const handleLockAdmin = () => {
+    setIsAdmin(false);
+    setShowAdminUnlock(false);
+    setIsAddingMember(false);
+    setShowCloudConfig(false);
+    setEditingInviteCode(false);
+    setEditingAdminCode(false);
+    Alert.alert('Member Mode 👤', 'Admin controls are now locked.');
   };
 
   const handleSaveBudget = () => {
@@ -160,18 +281,20 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   };
 
   const handleJoinFamily = async () => {
-    if (!joinCodeInput.trim()) {
-      Alert.alert('Enter Code', 'Please enter the 6-character family invite code.');
+    const code = joinCodeInput.trim().toUpperCase();
+    if (!code) {
+      Alert.alert('Enter Code', 'Please enter the 8-character family invite code starting with FAM.');
       return;
     }
 
     setIsJoining(true);
-    const joined = await joinFamilyGroupByCode(joinCodeInput.trim(), CURRENT_USER);
+    const joined = await joinFamilyGroupByCode(code, CURRENT_USER);
     setIsJoining(false);
 
     if (joined) {
       onUpdateGroup(joined);
       setJoinCodeInput('');
+      setIsAdmin(false);
       Alert.alert(
         'Welcome to Family! 👨‍👩‍👧‍👦',
         `You have successfully joined "${joined.name}". All household expenses and budget limits are now synced.`
@@ -179,7 +302,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     } else {
       Alert.alert(
         'Pairing Notice',
-        'Could not link family group. Please ensure Cloud Sync is connected and the invite code is correct.'
+        'Could not link family group. Please ensure Cloud Sync is connected and the 8-character code starting with FAM is correct.'
       );
     }
   };
@@ -235,89 +358,153 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
           </View>
 
           <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-            {/* Cloud Sync Status & Setup Card */}
-            <View style={styles.cloudCard}>
-              <View style={styles.cloudCardHeader}>
-                <View style={styles.cloudStatusRow}>
-                  <View
-                    style={[
-                      styles.cloudIndicator,
-                      { backgroundColor: isCloudConnected ? '#10B981' : '#94A3B8' },
-                    ]}
-                  />
-                  <Text style={styles.cloudStatusTitle}>
-                    {isCloudConnected ? 'Cloud Sync Active' : 'Local Offline Mode'}
+            {/* Admin vs Member Status Banner */}
+            <View style={[styles.roleBanner, isAdmin ? styles.roleBannerAdmin : styles.roleBannerMember]}>
+              <View style={styles.roleBannerLeft}>
+                <Ionicons
+                  name={isAdmin ? 'shield-checkmark' : 'person-circle-outline'}
+                  size={22}
+                  color={isAdmin ? '#B45309' : '#2563EB'}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roleBannerTitle, { color: isAdmin ? '#92400E' : '#1E40AF' }]}>
+                    {isAdmin ? '👑 Household Admin Mode' : '👤 Family Member Mode'}
+                  </Text>
+                  <Text style={[styles.roleBannerSub, { color: isAdmin ? '#B45309' : '#3B82F6' }]}>
+                    {isAdmin
+                      ? 'Full control: add/delete members, invite code & cloud'
+                      : 'Restricted: edit personal profile name only'}
                   </Text>
                 </View>
-
-                <TouchableOpacity
-                  style={styles.cloudConfigToggle}
-                  onPress={() => setShowCloudConfig((prev) => !prev)}
-                >
-                  <Ionicons name="cloud-outline" size={14} color="#059669" />
-                  <Text style={styles.cloudConfigToggleText}>
-                    {isCloudConnected ? 'Configured' : 'Setup Cloud'}
-                  </Text>
-                </TouchableOpacity>
               </View>
 
-              <Text style={styles.cloudCardSub}>
-                {isCloudConnected
-                  ? 'All family expenses sync live across all household phones automatically.'
-                  : 'Connect to free Supabase cloud to synchronize expenses between multiple phones.'}
-              </Text>
-
-              {/* Manual Upload Button when connected */}
-              {isCloudConnected && !showCloudConfig && (
+              {isAdmin ? (
+                <TouchableOpacity style={styles.lockRoleBtn} onPress={handleLockAdmin}>
+                  <Ionicons name="lock-closed" size={12} color="#64748B" />
+                  <Text style={styles.lockRoleBtnText}>Lock</Text>
+                </TouchableOpacity>
+              ) : (
                 <TouchableOpacity
-                  style={styles.syncNowBtn}
-                  onPress={handleManualSyncAll}
-                  disabled={isSyncingAll}
+                  style={styles.unlockRoleBtn}
+                  onPress={() => setShowAdminUnlock((prev) => !prev)}
                 >
-                  {isSyncingAll ? (
-                    <ActivityIndicator size="small" color="#059669" />
-                  ) : (
-                    <>
-                      <Ionicons name="cloud-upload" size={15} color="#059669" />
-                      <Text style={styles.syncNowBtnText}>Upload All Family Records to Supabase Now</Text>
-                    </>
-                  )}
+                  <Ionicons name="key" size={12} color="#FFFFFF" />
+                  <Text style={styles.unlockRoleBtnText}>Admin Login</Text>
                 </TouchableOpacity>
               )}
+            </View>
 
-              {/* Cloud Credentials Form */}
-              {showCloudConfig && (
-                <View style={styles.cloudForm}>
-                  <Text style={styles.cloudInputLabel}>Supabase Project URL:</Text>
+            {/* Admin Code Entry Sheet (when member wants to unlock admin) */}
+            {showAdminUnlock && !isAdmin && (
+              <View style={styles.adminUnlockCard}>
+                <View style={styles.adminUnlockHeader}>
+                  <Ionicons name="key-outline" size={16} color="#B45309" />
+                  <Text style={styles.adminUnlockTitle}>Enter Family Admin Code</Text>
+                </View>
+                <Text style={styles.adminUnlockSub}>
+                  Enter the secret admin passcode to unlock member management and cloud setup:
+                </Text>
+                <View style={styles.adminUnlockInputRow}>
                   <TextInput
-                    style={styles.cloudInput}
-                    placeholder="https://xyzcompany.supabase.co"
+                    style={styles.adminUnlockInput}
+                    placeholder="Enter Admin Code (e.g. FAM78699)"
                     placeholderTextColor="#94A3B8"
-                    value={supabaseUrl}
-                    onChangeText={setSupabaseUrl}
-                    autoCapitalize="none"
+                    value={adminCodeInput}
+                    onChangeText={setAdminCodeInput}
+                    autoCapitalize="characters"
                   />
-
-                  <Text style={styles.cloudInputLabel}>Anon API Key:</Text>
-                  <TextInput
-                    style={styles.cloudInput}
-                    placeholder="eyJhbGciOiJIUzI1NiIsIn..."
-                    placeholderTextColor="#94A3B8"
-                    value={supabaseKey}
-                    onChangeText={setSupabaseKey}
-                    autoCapitalize="none"
-                    secureTextEntry
-                  />
-
-                  <TouchableOpacity
-                    style={styles.saveCloudBtn}
-                    onPress={handleSaveCloudCredentials}
-                  >
-                    <Text style={styles.saveCloudBtnText}>Connect Cloud Database</Text>
+                  <TouchableOpacity style={styles.adminUnlockSubmitBtn} onPress={handleUnlockAdmin}>
+                    <Text style={styles.adminUnlockSubmitText}>Unlock</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-            </View>
+              </View>
+            )}
+
+            {/* Cloud Sync Status & Setup Card (ONLY FOR ADMIN) */}
+            {isAdmin && (
+              <View style={styles.cloudCard}>
+                <View style={styles.cloudCardHeader}>
+                  <View style={styles.cloudStatusRow}>
+                    <View
+                      style={[
+                        styles.cloudIndicator,
+                        { backgroundColor: isCloudConnected ? '#10B981' : '#94A3B8' },
+                      ]}
+                    />
+                    <Text style={styles.cloudStatusTitle}>
+                      {isCloudConnected ? 'Cloud Sync Active' : 'Local Offline Mode'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.cloudConfigToggle}
+                    onPress={() => setShowCloudConfig((prev) => !prev)}
+                  >
+                    <Ionicons name="cloud-outline" size={14} color="#059669" />
+                    <Text style={styles.cloudConfigToggleText}>
+                      {isCloudConnected ? 'Configured' : 'Setup Cloud'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.cloudCardSub}>
+                  {isCloudConnected
+                    ? 'All family expenses sync live across all household phones automatically.'
+                    : 'Connect to free Supabase cloud to synchronize expenses between multiple phones.'}
+                </Text>
+
+                {/* Manual Upload Button when connected */}
+                {isCloudConnected && !showCloudConfig && (
+                  <TouchableOpacity
+                    style={styles.syncNowBtn}
+                    onPress={handleManualSyncAll}
+                    disabled={isSyncingAll}
+                  >
+                    {isSyncingAll ? (
+                      <ActivityIndicator size="small" color="#059669" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-upload" size={15} color="#059669" />
+                        <Text style={styles.syncNowBtnText}>Upload All Family Records to Supabase Now</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Cloud Credentials Form */}
+                {showCloudConfig && (
+                  <View style={styles.cloudForm}>
+                    <Text style={styles.cloudInputLabel}>Supabase Project URL:</Text>
+                    <TextInput
+                      style={styles.cloudInput}
+                      placeholder="https://xyzcompany.supabase.co"
+                      placeholderTextColor="#94A3B8"
+                      value={supabaseUrl}
+                      onChangeText={setSupabaseUrl}
+                      autoCapitalize="none"
+                    />
+
+                    <Text style={styles.cloudInputLabel}>Anon API Key:</Text>
+                    <TextInput
+                      style={styles.cloudInput}
+                      placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                      placeholderTextColor="#94A3B8"
+                      value={supabaseKey}
+                      onChangeText={setSupabaseKey}
+                      autoCapitalize="none"
+                      secureTextEntry
+                    />
+
+                    <TouchableOpacity
+                      style={styles.saveCloudBtn}
+                      onPress={handleSaveCloudCredentials}
+                    >
+                      <Text style={styles.saveCloudBtnText}>Connect Cloud Database</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Join Existing Family Card */}
             <View style={styles.joinFamilyCard}>
@@ -326,18 +513,18 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 <Text style={styles.joinTitle}>Join Existing Family Group</Text>
               </View>
               <Text style={styles.joinSub}>
-                Have an invite code from another family member's phone? Enter it here to link:
+                Have an 8-character invite code from another family phone? Enter it here:
               </Text>
 
               <View style={styles.joinInputRow}>
                 <TextInput
                   style={styles.joinInput}
-                  placeholder="e.g. FAM786"
+                  placeholder="e.g. FAM78601"
                   placeholderTextColor="#94A3B8"
                   value={joinCodeInput}
                   onChangeText={(val) => setJoinCodeInput(val.toUpperCase())}
                   autoCapitalize="characters"
-                  maxLength={10}
+                  maxLength={8}
                 />
                 <TouchableOpacity
                   style={styles.joinSubmitBtn}
@@ -353,75 +540,165 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               </View>
             </View>
 
-            {/* Invite Code Card */}
+            {/* 8-Digit Invite Code Card */}
             <View style={styles.inviteCard}>
               <View style={styles.inviteHeader}>
-                <Ionicons name="key" size={18} color="#059669" />
-                <Text style={styles.inviteTitle}>Family Invite Code</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="key" size={18} color="#059669" />
+                  <Text style={styles.inviteTitle}>8-Digit Family Invite Code</Text>
+                </View>
+                {isAdmin && (
+                  <TouchableOpacity
+                    style={styles.editCodeToggleBtn}
+                    onPress={() => setEditingInviteCode((prev) => !prev)}
+                  >
+                    <Ionicons name="pencil-outline" size={13} color="#059669" />
+                    <Text style={styles.editCodeToggleText}>
+                      {editingInviteCode ? 'Cancel' : 'Change Code'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
+
               <Text style={styles.inviteSub}>
-                Share this 6-character code with your family members to link their phones:
+                Family members use this 8-digit code (starts with FAM) to link their devices:
               </Text>
 
-              <View style={styles.codeRow}>
-                <View style={styles.codeBox}>
-                  <Text style={styles.codeText}>{group.inviteCode}</Text>
+              {!editingInviteCode ? (
+                <View style={styles.codeRow}>
+                  <View style={styles.codeBox}>
+                    <Text style={styles.codeText}>{group.inviteCode}</Text>
+                  </View>
+
+                  <TouchableOpacity style={styles.copyBtn} onPress={handleCopyInviteCode}>
+                    <Ionicons
+                      name={copied ? 'checkmark' : 'copy-outline'}
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy'}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.shareBtn} onPress={handleShareInvite}>
+                    <Ionicons name="share-social-outline" size={16} color="#0F172A" />
+                  </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity style={styles.copyBtn} onPress={handleCopyInviteCode}>
-                  <Ionicons
-                    name={copied ? 'checkmark' : 'copy-outline'}
-                    size={16}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.shareBtn} onPress={handleShareInvite}>
-                  <Ionicons name="share-social-outline" size={16} color="#0F172A" />
-                </TouchableOpacity>
-              </View>
+              ) : (
+                <View style={styles.editCodeBox}>
+                  <Text style={styles.editCodeHint}>Must be exactly 8 characters starting with FAM:</Text>
+                  <View style={styles.editCodeInputRow}>
+                    <TextInput
+                      style={styles.editCodeInput}
+                      value={newInviteCodeInput}
+                      onChangeText={(val) => setNewInviteCodeInput(val.toUpperCase())}
+                      autoCapitalize="characters"
+                      maxLength={8}
+                    />
+                    <TouchableOpacity style={styles.saveCodeBtn} onPress={handleSaveInviteCode}>
+                      <Text style={styles.saveCodeBtnText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
+
+            {/* Admin Security Code Card (Visible ONLY to Admin) */}
+            {isAdmin && (
+              <View style={styles.adminCodeCard}>
+                <View style={styles.adminCodeHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="shield" size={18} color="#D97706" />
+                    <Text style={styles.adminCodeTitle}>Admin Security Code</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.editAdminCodeToggleBtn}
+                    onPress={() => setEditingAdminCode((prev) => !prev)}
+                  >
+                    <Ionicons name="pencil-outline" size={13} color="#D97706" />
+                    <Text style={styles.editAdminCodeToggleText}>
+                      {editingAdminCode ? 'Cancel' : 'Change'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.adminCodeSub}>
+                  Keep this passcode confidential. Anyone with this code can manage members and settings:
+                </Text>
+
+                {!editingAdminCode ? (
+                  <View style={styles.adminCodeDisplayRow}>
+                    <View style={styles.adminCodeBox}>
+                      <Text style={styles.adminCodeText}>{group.adminCode || 'FAM78699'}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.editCodeBox}>
+                    <View style={styles.editCodeInputRow}>
+                      <TextInput
+                        style={styles.editCodeInput}
+                        value={newAdminCodeInput}
+                        onChangeText={(val) => setNewAdminCodeInput(val.toUpperCase())}
+                        autoCapitalize="characters"
+                        placeholder="e.g. FAM78699"
+                      />
+                      <TouchableOpacity style={styles.saveAdminCodeBtn} onPress={handleSaveAdminCode}>
+                        <Text style={styles.saveAdminCodeBtnText}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Monthly Budget Setting */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Monthly Household Budget Limit</Text>
-              <View style={styles.budgetInputRow}>
-                <Text style={styles.currency}>₹</Text>
-                <TextInput
-                  style={styles.budgetInput}
-                  keyboardType="numeric"
-                  value={budget}
-                  onChangeText={setBudget}
-                />
-                <TouchableOpacity style={styles.saveBudgetBtn} onPress={handleSaveBudget}>
-                  <Text style={styles.saveBudgetBtnText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+              {isAdmin ? (
+                <View style={styles.budgetInputRow}>
+                  <Text style={styles.currency}>₹</Text>
+                  <TextInput
+                    style={styles.budgetInput}
+                    keyboardType="numeric"
+                    value={budget}
+                    onChangeText={setBudget}
+                  />
+                  <TouchableOpacity style={styles.saveBudgetBtn} onPress={handleSaveBudget}>
+                    <Text style={styles.saveBudgetBtnText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.readOnlyBudgetBox}>
+                  <Text style={styles.readOnlyBudgetText}>
+                    ₹{group.monthlyBudget.toLocaleString('en-IN')} / month
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Members List */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionLabel}>Active Household Members ({group.members.length})</Text>
-                <TouchableOpacity
-                  onPress={() => setIsAddingMember((prev) => !prev)}
-                  style={styles.addMemberToggle}
-                >
-                  <Ionicons name={isAddingMember ? 'close' : 'add-circle'} size={18} color="#059669" />
-                  <Text style={styles.addMemberToggleText}>
-                    {isAddingMember ? 'Cancel' : 'Add Member'}
-                  </Text>
-                </TouchableOpacity>
+                {/* Add Member button is ONLY visible to Admin */}
+                {isAdmin && (
+                  <TouchableOpacity
+                    onPress={() => setIsAddingMember((prev) => !prev)}
+                    style={styles.addMemberToggle}
+                  >
+                    <Ionicons name={isAddingMember ? 'close' : 'add-circle'} size={18} color="#059669" />
+                    <Text style={styles.addMemberToggleText}>
+                      {isAddingMember ? 'Cancel' : 'Add Member'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
-              {/* Add Member Form */}
-              {isAddingMember && (
+              {/* Add Member Form (Admin Only) */}
+              {isAdmin && isAddingMember && (
                 <View style={styles.addMemberBox}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                     <MemberAvatar size={42} />
                     <View>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>Member Profile</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>New Member Profile</Text>
                       <Text style={{ fontSize: 11, color: '#64748B' }}>Uses household profile picture</Text>
                     </View>
                   </View>
@@ -442,49 +719,101 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
 
               {/* List of members */}
               <View style={styles.membersList}>
-                {group.members.map((member) => (
-                  <View key={member.id} style={styles.memberCard}>
-                    <View style={styles.memberLeft}>
-                      <MemberAvatar size={40} />
-                      <View>
-                        <Text style={styles.memberName}>
-                          {member.name} {member.isCurrentUser ? '(You)' : ''}
-                        </Text>
-                        <Text style={styles.memberRole}>
-                          {member.role === 'HEAD' ? 'Household Admin' : 'Family Member'}
-                        </Text>
+                {group.members.map((member) => {
+                  const isCurrent = member.isCurrentUser || member.id === CURRENT_USER.id;
+                  return (
+                    <View key={member.id} style={styles.memberCard}>
+                      <View style={styles.memberLeft}>
+                        <MemberAvatar size={40} />
+                        <View style={{ flex: 1 }}>
+                          {isCurrent && editingMyName ? (
+                            <View style={styles.inlineNameEditRow}>
+                              <TextInput
+                                style={styles.inlineNameInput}
+                                value={myNewName}
+                                onChangeText={setMyNewName}
+                                placeholder="Your Name"
+                              />
+                              <TouchableOpacity style={styles.inlineSaveNameBtn} onPress={handleSaveMyName}>
+                                <Text style={styles.inlineSaveNameText}>Save</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.inlineCancelNameBtn}
+                                onPress={() => setEditingMyName(false)}
+                              >
+                                <Ionicons name="close" size={16} color="#64748B" />
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <Text style={styles.memberName}>
+                                {member.name} {isCurrent ? '(You)' : ''}
+                              </Text>
+                              {/* Option for member to change their own profile name */}
+                              {isCurrent && (
+                                <TouchableOpacity
+                                  style={styles.changeMyNameBtn}
+                                  onPress={() => {
+                                    setMyNewName(member.name);
+                                    setEditingMyName(true);
+                                  }}
+                                >
+                                  <Ionicons name="pencil" size={11} color="#2563EB" />
+                                  <Text style={styles.changeMyNameBtnText}>Change Name</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          )}
+                          <Text style={styles.memberRole}>
+                            {member.role === 'HEAD' ? 'Household Admin' : 'Family Member'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.memberActionsRight}>
+                        {/* Delete member is ONLY visible to Admin for non-head other members */}
+                        {isAdmin && !isCurrent && member.role !== 'HEAD' && (
+                          <TouchableOpacity
+                            style={styles.deleteMemberBtn}
+                            onPress={() => handleDeleteMember(member)}
+                            hitSlop={10}
+                          >
+                            <Ionicons name="trash-outline" size={17} color="#DC2626" />
+                          </TouchableOpacity>
+                        )}
+                        <View style={styles.memberStatusBadge}>
+                          <View style={styles.greenDot} />
+                          <Text style={styles.statusText}>Active</Text>
+                        </View>
                       </View>
                     </View>
-
-                    <View style={styles.memberStatusBadge}>
-                      <View style={styles.greenDot} />
-                      <Text style={styles.statusText}>Active</Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             </View>
 
-            {/* Reset & Start Fresh Section */}
-            <View style={styles.resetCard}>
-              <View style={styles.resetCardHeader}>
-                <Ionicons name="refresh-circle-outline" size={22} color="#DC2626" />
-                <Text style={styles.resetTitle}>Reset Ledger & Start Fresh</Text>
-              </View>
-              <Text style={styles.resetSubtitle}>
-                Wipe all existing expenses, inflows, and net savings from both this phone and the cloud to begin tracking on a fresh ₹0 slate.
-              </Text>
-              <TouchableOpacity
-                style={styles.resetButton}
-                onPress={handleClearAllRecords}
-                disabled={isResetting}
-              >
-                <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.resetButtonText}>
-                  {isResetting ? 'Clearing Records...' : 'Clear All Records & Start Fresh'}
+            {/* Reset & Start Fresh Section (Admin Only) */}
+            {isAdmin && (
+              <View style={styles.resetCard}>
+                <View style={styles.resetCardHeader}>
+                  <Ionicons name="refresh-circle-outline" size={22} color="#DC2626" />
+                  <Text style={styles.resetTitle}>Reset Ledger & Start Fresh</Text>
+                </View>
+                <Text style={styles.resetSubtitle}>
+                  Wipe all existing expenses, inflows, and net savings from both this phone and the cloud to begin tracking on a fresh ₹0 slate.
                 </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={handleClearAllRecords}
+                  disabled={isResetting}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.resetButtonText}>
+                    {isResetting ? 'Clearing Records...' : 'Clear All Records & Start Fresh'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={{ height: 30 }} />
           </ScrollView>
@@ -978,5 +1307,312 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  roleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+  },
+  roleBannerAdmin: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  roleBannerMember: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#DBEAFE',
+  },
+  roleBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    paddingRight: 8,
+  },
+  roleBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  roleBannerSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  lockRoleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  lockRoleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  unlockRoleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  unlockRoleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  adminUnlockCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  adminUnlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  adminUnlockTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  adminUnlockSub: {
+    fontSize: 11,
+    color: '#B45309',
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  adminUnlockInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  adminUnlockInput: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  adminUnlockSubmitBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminUnlockSubmitText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  editCodeToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  editCodeToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  editCodeBox: {
+    marginTop: 10,
+    gap: 6,
+  },
+  editCodeHint: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  editCodeInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editCodeInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 1,
+  },
+  saveCodeBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveCodeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  adminCodeCard: {
+    backgroundColor: '#FFFDF5',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  adminCodeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  adminCodeTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  editAdminCodeToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  editAdminCodeToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  adminCodeSub: {
+    fontSize: 12,
+    color: '#78350F',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  adminCodeDisplayRow: {
+    flexDirection: 'row',
+  },
+  adminCodeBox: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  adminCodeText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#92400E',
+    letterSpacing: 2,
+  },
+  saveAdminCodeBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveAdminCodeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  readOnlyBudgetBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  readOnlyBudgetText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  inlineNameEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  inlineNameInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  inlineSaveNameBtn: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  inlineSaveNameText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  inlineCancelNameBtn: {
+    padding: 4,
+  },
+  changeMyNameBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  changeMyNameBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  memberActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteMemberBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

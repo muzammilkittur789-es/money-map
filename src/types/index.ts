@@ -43,6 +43,7 @@ export interface FamilyGroup {
   id: string;
   name: string;
   inviteCode: string;
+  adminCode?: string;
   monthlyBudget: number;
   members: FamilyMember[];
   createdAt: string;

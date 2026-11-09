@@ -74,7 +74,7 @@ export async function syncExpenseToCloud(
   expense: Expense,
   familyGroupId: string,
   groupName = 'Our Family',
-  inviteCode = 'FAM786'
+  inviteCode = 'FAM78601'
 ): Promise<boolean> {
   // Only sync if expense is designated for the family pool
   if (expense.scope !== 'FAMILY') return true;
@@ -127,7 +127,7 @@ export async function syncInflowToCloud(
   inflow: InflowItem,
   familyGroupId: string,
   groupName = 'Our Family',
-  inviteCode = 'FAM786'
+  inviteCode = 'FAM78601'
 ): Promise<boolean> {
   if (inflow.scope !== 'FAMILY') return true;
 
@@ -312,6 +312,22 @@ export async function clearCloudFamilyRecords(familyGroupId: string): Promise<bo
     return true;
   } catch (err) {
     console.warn('Failed to clear cloud records:', err);
+    return false;
+  }
+}
+
+/**
+ * Remove a member from the cloud family group
+ */
+export async function deleteFamilyMemberFromCloud(memberId: string): Promise<boolean> {
+  const supabase = await getSupabase();
+  if (!supabase) return false;
+
+  try {
+    await supabase.from('family_members').delete().eq('id', memberId);
+    return true;
+  } catch (err) {
+    console.warn('Failed to delete member from cloud:', err);
     return false;
   }
 }
