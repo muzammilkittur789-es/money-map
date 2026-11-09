@@ -15,8 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { FamilyGroup, FamilyMember } from '../types';
 import {
+  claimAdminSession,
+  forceTakeoverAdminSession,
   getSupabaseCredentials,
   joinFamilyGroupByCode,
+  releaseAdminSession,
   saveSupabaseCredentials,
 } from '../services/supabase';
 import {
@@ -25,6 +28,10 @@ import {
   clearAllExpensesAndInflows,
   syncAllToCloud,
   deleteFamilyMember,
+  getDeviceId,
+  getDeviceMemberId,
+  saveFamilyGroup,
+  syncFamilyGroupFromCloud,
   updateCurrentUserName,
   updateFamilyInviteCode,
   updateFamilyAdminCode,
@@ -54,8 +61,10 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Admin permissions state
-  const [isAdmin, setIsAdmin] = useState(CURRENT_USER.role === 'HEAD');
+  // Admin permissions state (Universal mutex lock)
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deviceId, setDeviceId] = useState('');
+  const [isClaimingAdmin, setIsClaimingAdmin] = useState(false);
   const [adminCodeInput, setAdminCodeInput] = useState('');
   const [showAdminUnlock, setShowAdminUnlock] = useState(false);
   const [editingAdminCode, setEditingAdminCode] = useState(false);
@@ -77,6 +86,25 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  useEffect(() => {
+    getDeviceId().then((id) => {
+      setDeviceId(id);
+      if (group.activeAdminDeviceId && group.activeAdminDeviceId === id) {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    });
+  }, [group.activeAdminDeviceId, visible]);
+
+  useEffect(() => {
+    if (visible && group?.id) {
+      syncFamilyGroupFromCloud(group.id).then((freshGroup) => {
+        if (freshGroup) onUpdateGroup(freshGroup);
+      });
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -196,39 +224,100 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   const handleSaveAdminCode = async () => {
     if (!isAdmin) return;
     const code = newAdminCodeInput.trim().toUpperCase();
-    if (code.length < 4) {
-      Alert.alert('Invalid Admin Code', 'Admin code must be at least 4 characters long.');
+    if (!code.startsWith('FAM') || code.length !== 8) {
+      Alert.alert(
+        'Invalid Admin Code',
+        'The Universal Admin Security Code must be exactly 8 characters starting with "FAM" (for example: FAM78699, FAM88888).'
+      );
       return;
     }
     const updated = await updateFamilyAdminCode(code);
     onUpdateGroup(updated);
     setEditingAdminCode(false);
-    Alert.alert('Admin Code Updated 🛡️', `New Admin Security Code is: ${code}`);
+    Alert.alert(
+      'Universal Admin Code Updated 🛡️',
+      `New Universal Admin Code is: ${code}. This code is synchronized across all family phones via the cloud.`
+    );
   };
 
-  const handleUnlockAdmin = () => {
+  const handleUnlockAdmin = async () => {
     const entered = adminCodeInput.trim().toUpperCase();
-    const expected = (group.adminCode || 'FAM78699').trim().toUpperCase();
-    if (entered === expected) {
+    if (!entered) {
+      Alert.alert('Admin Code Required', 'Please enter the family admin security code.');
+      return;
+    }
+
+    setIsClaimingAdmin(true);
+    const res = await claimAdminSession(
+      group.id,
+      deviceId,
+      CURRENT_USER.name || 'Admin Phone',
+      entered
+    );
+    setIsClaimingAdmin(false);
+
+    if (res.success) {
       setIsAdmin(true);
       setShowAdminUnlock(false);
       setAdminCodeInput('');
+      if (res.group) onUpdateGroup(res.group);
       Alert.alert(
-        'Admin Access Unlocked 👑',
-        'You now have admin access to add or delete members, customize the 8-digit invite code, and configure cloud sync.'
+        'Admin Access Granted 👑',
+        'You are now logged in as the universal household admin. Admin controls are active on this phone.'
       );
     } else {
-      Alert.alert('Incorrect Admin Code', 'The entered code does not match. Please verify with the household admin.');
+      if (res.currentAdminName) {
+        Alert.alert(
+          'Admin Session Active ⚠️',
+          res.message || 'Another phone is currently holding the admin session.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Take Over Admin',
+              style: 'destructive',
+              onPress: async () => {
+                setIsClaimingAdmin(true);
+                const forceRes = await forceTakeoverAdminSession(
+                  group.id,
+                  deviceId,
+                  CURRENT_USER.name || 'Admin Phone',
+                  entered
+                );
+                setIsClaimingAdmin(false);
+                if (forceRes.success) {
+                  setIsAdmin(true);
+                  setShowAdminUnlock(false);
+                  setAdminCodeInput('');
+                  if (forceRes.group) onUpdateGroup(forceRes.group);
+                  Alert.alert('Session Transferred 👑', 'Admin session has been transferred to this phone.');
+                } else {
+                  Alert.alert('Notice', forceRes.message || 'Could not transfer admin session.');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Access Denied', res.message || 'Incorrect Admin Security Code.');
+      }
     }
   };
 
-  const handleLockAdmin = () => {
+  const handleLockAdmin = async () => {
+    await releaseAdminSession(group.id, deviceId);
     setIsAdmin(false);
     setShowAdminUnlock(false);
     setIsAddingMember(false);
     setShowCloudConfig(false);
     setEditingInviteCode(false);
     setEditingAdminCode(false);
+    const updated = {
+      ...group,
+      activeAdminDeviceId: null,
+      activeAdminName: null,
+      activeAdminAt: null,
+    };
+    onUpdateGroup(updated);
     Alert.alert('Member Mode 👤', 'Admin controls are now locked.');
   };
 
@@ -290,10 +379,20 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     }
 
     setIsJoining(true);
-    const joined = await joinFamilyGroupByCode(code, CURRENT_USER);
+    const devMemberId = await getDeviceMemberId();
+    const joinedUser: FamilyMember = {
+      id: devMemberId,
+      name: myNewName.trim() || CURRENT_USER.name || 'Family Member',
+      role: 'MEMBER',
+      avatar: 'default',
+      color: '#3B82F6',
+      isCurrentUser: true,
+    };
+    const joined = await joinFamilyGroupByCode(code, joinedUser);
     setIsJoining(false);
 
     if (joined) {
+      await saveFamilyGroup(joined);
       onUpdateGroup(joined);
       setJoinCodeInput('');
       setIsAdmin(false);
@@ -303,12 +402,12 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
       } catch {}
       Alert.alert(
         'Welcome to Family! 👨‍👩‍👧‍👦',
-        `You have successfully joined "${joined.name}". All household expenses and budget limits are now synced.`
+        `You have successfully joined "${joined.name}". All household expenses, members, and budget limits are now synced.`
       );
     } else {
       Alert.alert(
         'Pairing Notice',
-        'Could not link family group. Please ensure Cloud Sync is connected and the 8-character code starting with FAM is correct.'
+        'Could not link family group. Please ensure the 8-character code starting with FAM is correct.'
       );
     }
   };
@@ -374,11 +473,17 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.roleBannerTitle, { color: isAdmin ? '#92400E' : '#1E40AF' }]}>
-                    {isAdmin ? '👑 Household Admin Mode' : '👤 Family Member Mode'}
+                    {isAdmin
+                      ? '👑 Household Admin Active (This Phone)'
+                      : group.activeAdminDeviceId && group.activeAdminDeviceId !== deviceId
+                      ? '🔒 Universal Admin In Use'
+                      : '👤 Family Member Mode'}
                   </Text>
                   <Text style={[styles.roleBannerSub, { color: isAdmin ? '#B45309' : '#3B82F6' }]}>
                     {isAdmin
-                      ? 'Full control: add/delete members, invite code & cloud'
+                      ? 'Full universal control: add/delete members, invite code & cloud'
+                      : group.activeAdminDeviceId && group.activeAdminDeviceId !== deviceId
+                      ? `Locked by "${group.activeAdminName || 'Another phone'}". Only 1 admin active at a time.`
                       : 'Restricted: edit personal profile name only'}
                   </Text>
                 </View>
@@ -408,7 +513,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                   <Text style={styles.adminUnlockTitle}>Enter Family Admin Code</Text>
                 </View>
                 <Text style={styles.adminUnlockSub}>
-                  Enter the secret admin passcode to unlock member management and cloud setup:
+                  Enter the universal 8-digit admin passcode (e.g. FAM78699) to unlock member management and cloud setup:
                 </Text>
                 <View style={styles.adminUnlockInputRow}>
                   <TextInput
@@ -419,8 +524,16 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                     onChangeText={setAdminCodeInput}
                     autoCapitalize="characters"
                   />
-                  <TouchableOpacity style={styles.adminUnlockSubmitBtn} onPress={handleUnlockAdmin}>
-                    <Text style={styles.adminUnlockSubmitText}>Unlock</Text>
+                  <TouchableOpacity
+                    style={styles.adminUnlockSubmitBtn}
+                    onPress={handleUnlockAdmin}
+                    disabled={isClaimingAdmin}
+                  >
+                    {isClaimingAdmin ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.adminUnlockSubmitText}>Unlock</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -683,7 +796,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
             {/* Members List */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionLabel}>Active Household Members ({group.members.length})</Text>
+                <Text style={styles.sectionLabel}>Household Members ({group.members.length})</Text>
                 {/* Add Member button is ONLY visible to Admin */}
                 {isAdmin && (
                   <TouchableOpacity

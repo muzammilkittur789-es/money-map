@@ -31,6 +31,7 @@ import {
   saveFamilyGroup,
   saveInflow,
   syncFamilyFromCloud,
+  syncFamilyGroupFromCloud,
   syncInflowsFromCloud,
 } from '../services/storage';
 import { subscribeToFamilyUpdates } from '../services/supabase';
@@ -76,6 +77,13 @@ export const HomeScreen: React.FC = () => {
       setExpenses(storedExpenses);
       setInflows(storedInflows);
       setFamilyGroup(group);
+
+      // Immediately fetch latest members & settings from cloud
+      if (group?.id) {
+        syncFamilyGroupFromCloud(group.id).then((cloudGroup) => {
+          if (cloudGroup) setFamilyGroup(cloudGroup);
+        });
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -92,7 +100,10 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (!familyGroup) return;
 
-    // Fetch latest cloud state on load for both expenses and inflows
+    // Fetch latest cloud state on load for group, members, expenses and inflows
+    syncFamilyGroupFromCloud(familyGroup.id).then((cloudGroup) => {
+      if (cloudGroup) setFamilyGroup(cloudGroup);
+    });
     syncFamilyFromCloud(familyGroup.id).then((cloudExpenses) => {
       setExpenses(cloudExpenses);
     });
@@ -100,8 +111,10 @@ export const HomeScreen: React.FC = () => {
       setInflows(cloudInflows);
     });
 
-    // Subscribe to live push events from other household devices
+    // Subscribe to live push events from other household devices (expenses, inflows, members, admin lock)
     const unsubscribe = subscribeToFamilyUpdates(familyGroup.id, async () => {
+      const refreshedGroup = await syncFamilyGroupFromCloud(familyGroup.id);
+      if (refreshedGroup) setFamilyGroup(refreshedGroup);
       const refreshedExpenses = await syncFamilyFromCloud(familyGroup.id);
       setExpenses(refreshedExpenses);
       const refreshedInflows = await syncInflowsFromCloud(familyGroup.id);

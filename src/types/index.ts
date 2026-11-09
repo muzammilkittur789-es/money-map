@@ -44,6 +44,9 @@ export interface FamilyGroup {
   name: string;
   inviteCode: string;
   adminCode?: string;
+  activeAdminDeviceId?: string | null;
+  activeAdminName?: string | null;
+  activeAdminAt?: string | null;
   monthlyBudget: number;
   members: FamilyMember[];
   createdAt: string;

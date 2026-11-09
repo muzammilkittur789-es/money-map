@@ -268,7 +268,243 @@ export async function deleteCloudInflow(inflowId: string): Promise<boolean> {
 }
 
 /**
- * Join an existing family group using the 6-digit invite code
+ * Fetch all members of a family group from the cloud
+ */
+export async function fetchCloudFamilyMembers(familyGroupId: string): Promise<FamilyMember[]> {
+  const supabase = await getSupabase();
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('family_members')
+      .select('*')
+      .eq('family_group_id', familyGroupId)
+      .order('created_at', { ascending: true });
+
+    if (error || !data || data.length === 0) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      name: row.name,
+      role: row.role || 'MEMBER',
+      avatar: row.avatar || 'default',
+      color: row.role === 'HEAD' ? '#059669' : '#3B82F6',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch full family group metadata & members from the cloud
+ */
+export async function fetchCloudFamilyGroup(familyGroupId: string): Promise<FamilyGroup | null> {
+  const supabase = await getSupabase();
+  if (!supabase) return null;
+
+  try {
+    const { data: groupData, error: groupErr } = await supabase
+      .from('family_groups')
+      .select('*')
+      .eq('id', familyGroupId)
+      .single();
+
+    if (groupErr || !groupData) return null;
+
+    const members = await fetchCloudFamilyMembers(familyGroupId);
+
+    return {
+      id: groupData.id,
+      name: groupData.name,
+      inviteCode: groupData.invite_code || 'FAM78601',
+      adminCode: groupData.admin_code || 'FAM78699',
+      activeAdminDeviceId: groupData.active_admin_device_id || null,
+      activeAdminName: groupData.active_admin_name || null,
+      activeAdminAt: groupData.active_admin_at || null,
+      monthlyBudget: parseFloat(groupData.monthly_budget) || 35000,
+      members,
+      createdAt: groupData.created_at || new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mutual Exclusivity Admin Mutex:
+ * Attempts to claim exclusive admin rights on the family group.
+ * If another phone is currently holding the admin session, rejects the request.
+ */
+export async function claimAdminSession(
+  familyGroupId: string,
+  deviceId: string,
+  adminName: string,
+  enteredCode: string
+): Promise<{ success: boolean; message?: string; group?: FamilyGroup; currentAdminName?: string }> {
+  const supabase = await getSupabase();
+  if (!supabase) {
+    return { success: false, message: 'Cloud database connection is currently unavailable.' };
+  }
+
+  try {
+    // 1. Fetch current live group state directly from Supabase
+    const { data: groupData, error } = await supabase
+      .from('family_groups')
+      .select('*')
+      .eq('id', familyGroupId)
+      .single();
+
+    if (error || !groupData) {
+      return { success: false, message: 'Could not locate family group in the cloud.' };
+    }
+
+    const cloudAdminCode = (groupData.admin_code || 'FAM78699').trim().toUpperCase();
+    const cleanEntered = enteredCode.trim().toUpperCase();
+
+    // 2. Validate admin code
+    if (cleanEntered !== cloudAdminCode) {
+      return {
+        success: false,
+        message: 'Incorrect Admin Security Code. Please enter the current universal family admin code.',
+      };
+    }
+
+    // 3. Mutual Exclusivity Mutex Check:
+    // If active_admin_device_id is set to a different device, check if session is still active
+    const activeDeviceId = groupData.active_admin_device_id;
+    const activeAdminName = groupData.active_admin_name || 'Another Household Member';
+    const activeAt = groupData.active_admin_at ? new Date(groupData.active_admin_at).getTime() : 0;
+    const now = Date.now();
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+    if (activeDeviceId && activeDeviceId !== deviceId) {
+      // Check if session has expired (> 2 hours without renewal)
+      const isExpired = now - activeAt > TWO_HOURS_MS;
+      if (!isExpired) {
+        return {
+          success: false,
+          currentAdminName: activeAdminName,
+          message: `Admin access is currently locked to "${activeAdminName}". Only ONE universal admin can be active at a time to prevent conflicting changes. Ask them to lock admin controls, or choose "Take Over Session" if that device is inactive.`,
+        };
+      }
+    }
+
+    // 4. Claim the mutex lock in Supabase
+    const timestamp = new Date().toISOString();
+    const { error: updateErr } = await supabase
+      .from('family_groups')
+      .update({
+        active_admin_device_id: deviceId,
+        active_admin_name: adminName.trim() || 'Admin Phone',
+        active_admin_at: timestamp,
+      })
+      .eq('id', familyGroupId);
+
+    if (updateErr) {
+      return { success: false, message: 'Failed to acquire admin lock. Please try again.' };
+    }
+
+    const fullGroup = await fetchCloudFamilyGroup(familyGroupId);
+    return { success: true, group: fullGroup || undefined };
+  } catch (err) {
+    console.warn('Error claiming admin session:', err);
+    return { success: false, message: 'Network error while validating admin session.' };
+  }
+}
+
+/**
+ * Force takeover of admin session (if previous device died, closed app without locking, etc.)
+ */
+export async function forceTakeoverAdminSession(
+  familyGroupId: string,
+  deviceId: string,
+  adminName: string,
+  enteredCode: string
+): Promise<{ success: boolean; message?: string; group?: FamilyGroup }> {
+  const supabase = await getSupabase();
+  if (!supabase) return { success: false, message: 'Cloud connection unavailable.' };
+
+  try {
+    const { data: groupData } = await supabase
+      .from('family_groups')
+      .select('admin_code')
+      .eq('id', familyGroupId)
+      .single();
+
+    const cloudAdminCode = (groupData?.admin_code || 'FAM78699').trim().toUpperCase();
+    if (enteredCode.trim().toUpperCase() !== cloudAdminCode) {
+      return { success: false, message: 'Incorrect Admin Security Code.' };
+    }
+
+    const timestamp = new Date().toISOString();
+    await supabase
+      .from('family_groups')
+      .update({
+        active_admin_device_id: deviceId,
+        active_admin_name: adminName.trim() || 'Admin Phone',
+        active_admin_at: timestamp,
+      })
+      .eq('id', familyGroupId);
+
+    const fullGroup = await fetchCloudFamilyGroup(familyGroupId);
+    return { success: true, group: fullGroup || undefined };
+  } catch (err) {
+    return { success: false, message: 'Failed to take over admin session.' };
+  }
+}
+
+/**
+ * Release admin lock when the admin logs out or locks controls
+ */
+export async function releaseAdminSession(
+  familyGroupId: string,
+  deviceId: string
+): Promise<boolean> {
+  const supabase = await getSupabase();
+  if (!supabase) return false;
+
+  try {
+    await supabase
+      .from('family_groups')
+      .update({
+        active_admin_device_id: null,
+        active_admin_name: null,
+        active_admin_at: null,
+      })
+      .eq('id', familyGroupId)
+      .eq('active_admin_device_id', deviceId);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Update the Universal Admin Security Code across the cloud for all devices
+ */
+export async function updateCloudAdminCode(
+  familyGroupId: string,
+  newAdminCode: string
+): Promise<boolean> {
+  const supabase = await getSupabase();
+  if (!supabase) return false;
+
+  try {
+    const cleanCode = newAdminCode.trim().toUpperCase();
+    const { error } = await supabase
+      .from('family_groups')
+      .update({ admin_code: cleanCode })
+      .eq('id', familyGroupId);
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Join an existing family group using the 8-digit invite code
  */
 export async function joinFamilyGroupByCode(
   inviteCode: string,
@@ -286,38 +522,28 @@ export async function joinFamilyGroupByCode(
 
     if (error || !groupData) return null;
 
-    // Add user to family_members table in cloud
+    // Add user to family_members table in cloud as MEMBER (never override existing HEAD)
     await supabase.from('family_members').upsert({
       id: joiningUser.id,
       family_group_id: groupData.id,
       name: joiningUser.name,
-      avatar: joiningUser.avatar,
+      avatar: 'default',
       role: 'MEMBER',
     });
 
     // Fetch all current members in this group
-    const { data: membersData } = await supabase
-      .from('family_members')
-      .select('*')
-      .eq('family_group_id', groupData.id);
-
-    const members: FamilyMember[] = membersData
-      ? membersData.map((m) => ({
-          id: m.id,
-          name: m.name,
-          role: m.role || 'MEMBER',
-          avatar: m.avatar || '👤',
-          color: '#3B82F6',
-          isCurrentUser: m.id === joiningUser.id,
-        }))
-      : [joiningUser];
+    const members = await fetchCloudFamilyMembers(groupData.id);
 
     return {
       id: groupData.id,
       name: groupData.name,
       inviteCode: groupData.invite_code,
+      adminCode: groupData.admin_code || 'FAM78699',
+      activeAdminDeviceId: groupData.active_admin_device_id || null,
+      activeAdminName: groupData.active_admin_name || null,
+      activeAdminAt: groupData.active_admin_at || null,
       monthlyBudget: parseFloat(groupData.monthly_budget) || 35000,
-      members,
+      members: members.length > 0 ? members : [joiningUser],
       createdAt: groupData.created_at || new Date().toISOString(),
     };
   } catch {
@@ -337,6 +563,7 @@ export async function syncFamilyGroupToCloud(group: FamilyGroup): Promise<boolea
       id: group.id,
       name: group.name,
       invite_code: group.inviteCode,
+      admin_code: group.adminCode || 'FAM78699',
       monthly_budget: group.monthlyBudget,
     });
 
@@ -345,7 +572,7 @@ export async function syncFamilyGroupToCloud(group: FamilyGroup): Promise<boolea
         id: member.id,
         family_group_id: group.id,
         name: member.name,
-        avatar: member.avatar,
+        avatar: 'default',
         role: member.role,
       });
     }
@@ -391,7 +618,8 @@ export async function deleteFamilyMemberFromCloud(memberId: string): Promise<boo
 
 /**
  * Real-time WebSocket listener: Auto-refreshes the dashboard within 1 second
- * whenever any family member on any phone logs a new expense or inflow!
+ * whenever any family member on any phone logs a new expense or inflow,
+ * or when group settings / members / admin session change!
  */
 export function subscribeToFamilyUpdates(
   familyGroupId: string,
@@ -422,6 +650,30 @@ export function subscribeToFamilyUpdates(
           event: '*',
           schema: 'public',
           table: 'inflows',
+          filter: `family_group_id=eq.${familyGroupId}`,
+        },
+        () => {
+          onUpdate();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'family_groups',
+          filter: `id=eq.${familyGroupId}`,
+        },
+        () => {
+          onUpdate();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'family_members',
           filter: `family_group_id=eq.${familyGroupId}`,
         },
         () => {
