@@ -30,7 +30,10 @@ import {
   saveExpense,
   saveFamilyGroup,
   saveInflow,
+  syncFamilyFromCloud,
 } from '../services/storage';
+import { subscribeToFamilyUpdates } from '../services/supabase';
+import { generateAndSharePdfReport } from '../utils/pdfGenerator';
 import { Header } from '../components/Header';
 import { StatSummary } from '../components/StatSummary';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
@@ -64,6 +67,7 @@ export const HomeScreen: React.FC = () => {
 
   const [scannedUpiData, setScannedUpiData] = useState<ParsedUpiData | null>(null);
   const [defaultPaymentMode, setDefaultPaymentMode] = useState<PaymentMode>('ONLINE');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const loadData = async () => {
     try {
@@ -82,6 +86,26 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Real-time Auto-Refresh Subscription via Supabase WebSockets
+  useEffect(() => {
+    if (!familyGroup) return;
+
+    // Fetch latest cloud state on load
+    syncFamilyFromCloud(familyGroup.id).then((cloudMerged) => {
+      setExpenses(cloudMerged);
+    });
+
+    // Subscribe to live push events from other household devices
+    const unsubscribe = subscribeToFamilyUpdates(familyGroup.id, async () => {
+      const refreshed = await syncFamilyFromCloud(familyGroup.id);
+      setExpenses(refreshed);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [familyGroup?.id]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -207,6 +231,19 @@ export const HomeScreen: React.FC = () => {
     setAddExpenseVisible(true);
   };
 
+  const handleDownloadPdf = async () => {
+    if (!familyGroup) return;
+    setIsGeneratingPdf(true);
+    await generateAndSharePdfReport({
+      expenses: filteredExpenses,
+      inflows: filteredInflows,
+      scope: currentScope,
+      group: familyGroup,
+      periodLabel: getPeriodLabel(),
+    });
+    setIsGeneratingPdf(false);
+  };
+
   const getPeriodLabel = (): string => {
     switch (timeFilter) {
       case 'TODAY':
@@ -292,10 +329,28 @@ export const HomeScreen: React.FC = () => {
 
           {/* Recent Transactions Section */}
           <View style={styles.transactionsHeader}>
-            <Text style={styles.transactionsTitle}>
-              {currentScope === 'FAMILY' ? 'Family Expenses' : 'My Personal Spends'}
-            </Text>
-            <Text style={styles.transactionsCount}>{filteredExpenses.length} entries</Text>
+            <View>
+              <Text style={styles.transactionsTitle}>
+                {currentScope === 'FAMILY' ? 'Family Expenses' : 'My Personal Spends'}
+              </Text>
+              <Text style={styles.transactionsCount}>{filteredExpenses.length} entries</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.pdfDownloadBtn}
+              onPress={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              activeOpacity={0.8}
+            >
+              {isGeneratingPdf ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <>
+                  <Ionicons name="document-text" size={14} color="#059669" />
+                  <Text style={styles.pdfDownloadBtnText}>PDF Statement</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           {filteredExpenses.length === 0 ? (
@@ -548,6 +603,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
+  },
+  pdfDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 5,
+  },
+  pdfDownloadBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
   },
   transactionsList: {
     paddingHorizontal: 20,

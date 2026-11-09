@@ -32,7 +32,8 @@
         {
           "cameraPermission": "Camera permission is needed to scan merchant UPI QR codes."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

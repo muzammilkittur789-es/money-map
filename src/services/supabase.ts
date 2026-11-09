@@ -298,3 +298,54 @@ export async function syncFamilyGroupToCloud(group: FamilyGroup): Promise<boolea
     return false;
   }
 }
+
+/**
+ * Real-time WebSocket listener: Auto-refreshes the dashboard within 1 second
+ * whenever any family member on any phone logs a new expense or inflow!
+ */
+export function subscribeToFamilyUpdates(
+  familyGroupId: string,
+  onUpdate: () => void
+): () => void {
+  let activeChannel: any = null;
+
+  getSupabase().then((supabase) => {
+    if (!supabase) return;
+
+    activeChannel = supabase
+      .channel(`realtime_family_${familyGroupId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses',
+          filter: `family_group_id=eq.${familyGroupId}`,
+        },
+        () => {
+          onUpdate();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inflows',
+          filter: `family_group_id=eq.${familyGroupId}`,
+        },
+        () => {
+          onUpdate();
+        }
+      )
+      .subscribe();
+  });
+
+  return () => {
+    if (activeChannel) {
+      getSupabase().then((supabase) => {
+        supabase?.removeChannel(activeChannel);
+      });
+    }
+  };
+}
