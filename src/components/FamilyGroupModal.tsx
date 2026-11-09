@@ -781,10 +781,6 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                             <Ionicons name="trash-outline" size={17} color="#DC2626" />
                           </TouchableOpacity>
                         )}
-                        <View style={styles.memberStatusBadge}>
-                          <View style={styles.greenDot} />
-                          <Text style={styles.statusText}>Active</Text>
-                        </View>
                       </View>
                     </View>
                   );
