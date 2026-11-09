@@ -31,6 +31,7 @@ import {
   saveFamilyGroup,
   saveInflow,
   syncFamilyFromCloud,
+  syncInflowsFromCloud,
 } from '../services/storage';
 import { subscribeToFamilyUpdates } from '../services/supabase';
 import { generateAndSharePdfReport } from '../utils/pdfGenerator';
@@ -91,15 +92,20 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (!familyGroup) return;
 
-    // Fetch latest cloud state on load
-    syncFamilyFromCloud(familyGroup.id).then((cloudMerged) => {
-      setExpenses(cloudMerged);
+    // Fetch latest cloud state on load for both expenses and inflows
+    syncFamilyFromCloud(familyGroup.id).then((cloudExpenses) => {
+      setExpenses(cloudExpenses);
+    });
+    syncInflowsFromCloud(familyGroup.id).then((cloudInflows) => {
+      setInflows(cloudInflows);
     });
 
     // Subscribe to live push events from other household devices
     const unsubscribe = subscribeToFamilyUpdates(familyGroup.id, async () => {
-      const refreshed = await syncFamilyFromCloud(familyGroup.id);
-      setExpenses(refreshed);
+      const refreshedExpenses = await syncFamilyFromCloud(familyGroup.id);
+      setExpenses(refreshedExpenses);
+      const refreshedInflows = await syncInflowsFromCloud(familyGroup.id);
+      setInflows(refreshedInflows);
     });
 
     return () => {

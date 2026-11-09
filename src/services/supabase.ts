@@ -8,7 +8,11 @@ const STORAGE_KEYS = {
   SUPABASE_ANON_KEY: '@money_map/supabase_anon_key',
 };
 
-// Default placeholder or configured credentials
+// Default baked-in Supabase cloud credentials for seamless multi-phone sync
+export const DEFAULT_SUPABASE_URL = 'https://cngnywqdtsbxwjytcxgl.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuZ255d3FkdHNieHdqeXRjeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMDY3MDUsImV4cCI6MjEwOTc4MjcwNX0.YcHhcdC8qH-UWrGhFRURa-DzHpzwl6H3baWEaCSPz1I';
+
 let supabaseClient: SupabaseClient | null = null;
 
 function sanitizeSupabaseUrl(rawUrl: string): string {
@@ -19,16 +23,16 @@ function sanitizeSupabaseUrl(rawUrl: string): string {
   return cleaned;
 }
 
-export async function getSupabaseCredentials(): Promise<{ url: string; anonKey: string } | null> {
+export async function getSupabaseCredentials(): Promise<{ url: string; anonKey: string }> {
   try {
     const url = await AsyncStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
     const anonKey = await AsyncStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
     if (url && anonKey) {
       return { url: sanitizeSupabaseUrl(url), anonKey };
     }
-    return null;
+    return { url: DEFAULT_SUPABASE_URL, anonKey: DEFAULT_SUPABASE_ANON_KEY };
   } catch {
-    return null;
+    return { url: DEFAULT_SUPABASE_URL, anonKey: DEFAULT_SUPABASE_ANON_KEY };
   }
 }
 
@@ -51,20 +55,16 @@ export async function saveSupabaseCredentials(url: string, anonKey: string): Pro
   }
 }
 
-export async function getSupabase(): Promise<SupabaseClient | null> {
+export async function getSupabase(): Promise<SupabaseClient> {
   if (supabaseClient) return supabaseClient;
 
   const creds = await getSupabaseCredentials();
-  if (creds) {
-    supabaseClient = createClient(creds.url, creds.anonKey, {
-      auth: {
-        persistSession: false,
-      },
-    });
-    return supabaseClient;
-  }
-
-  return null;
+  supabaseClient = createClient(creds.url, creds.anonKey, {
+    auth: {
+      persistSession: false,
+    },
+  });
+  return supabaseClient;
 }
 
 /**
@@ -207,6 +207,63 @@ export async function fetchCloudFamilyExpenses(familyGroupId: string): Promise<E
     }));
   } catch {
     return [];
+  }
+}
+
+/**
+ * Fetch all family inflows from the cloud
+ */
+export async function fetchCloudFamilyInflows(familyGroupId: string): Promise<InflowItem[]> {
+  const supabase = await getSupabase();
+
+  try {
+    const { data, error } = await supabase
+      .from('inflows')
+      .select('*')
+      .eq('family_group_id', familyGroupId)
+      .order('date', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      title: row.title,
+      amount: parseFloat(row.amount),
+      category: row.category,
+      channel: row.channel,
+      scope: row.scope,
+      receivedBy: {
+        id: row.received_by_id,
+        name: row.received_by_name,
+        role: 'MEMBER',
+        avatar: row.received_by_avatar || 'default',
+        color: '#10B981',
+      },
+      date: row.date,
+      notes: row.notes,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteCloudExpense(expenseId: string): Promise<boolean> {
+  const supabase = await getSupabase();
+  try {
+    await supabase.from('expenses').delete().eq('id', expenseId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteCloudInflow(inflowId: string): Promise<boolean> {
+  const supabase = await getSupabase();
+  try {
+    await supabase.from('inflows').delete().eq('id', inflowId);
+    return true;
+  } catch {
+    return false;
   }
 }
 

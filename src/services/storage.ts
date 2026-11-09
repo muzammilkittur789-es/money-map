@@ -2,8 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Expense, FamilyGroup, FamilyMember, InflowItem } from '../types';
 import {
   clearCloudFamilyRecords,
+  deleteCloudExpense,
+  deleteCloudInflow,
   deleteFamilyMemberFromCloud,
   fetchCloudFamilyExpenses,
+  fetchCloudFamilyInflows,
   syncExpenseToCloud,
   syncFamilyGroupToCloud,
   syncInflowToCloud,
@@ -146,6 +149,7 @@ export async function deleteExpense(id: string): Promise<Expense[]> {
     const current = await getExpenses();
     const updated = current.filter((item) => item.id !== id);
     await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(updated));
+    deleteCloudExpense(id);
     return updated;
   } catch (e) {
     console.error('Error deleting expense:', e);
@@ -188,6 +192,7 @@ export async function deleteInflow(id: string): Promise<InflowItem[]> {
     const current = await getInflows();
     const updated = current.filter((item) => item.id !== id);
     await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify(updated));
+    deleteCloudInflow(id);
     return updated;
   } catch (e) {
     console.error('Error deleting inflow:', e);
@@ -235,6 +240,29 @@ export async function syncFamilyFromCloud(familyGroupId: string): Promise<Expens
   } catch (error) {
     console.warn('Failed to sync from cloud:', error);
     return await getExpenses();
+  }
+}
+
+export async function syncInflowsFromCloud(familyGroupId: string): Promise<InflowItem[]> {
+  try {
+    const cloudInflows = await fetchCloudFamilyInflows(familyGroupId);
+    if (!cloudInflows || cloudInflows.length === 0) {
+      return await getInflows();
+    }
+
+    const localInflows = await getInflows();
+    const personalInflows = localInflows.filter((i) => i.scope === 'PERSONAL');
+    const existingFamilyIds = new Set(cloudInflows.map((c) => c.id));
+    const uniqueLocalFamily = localInflows.filter(
+      (i) => i.scope === 'FAMILY' && !existingFamilyIds.has(i.id)
+    );
+
+    const merged = [...cloudInflows, ...uniqueLocalFamily, ...personalInflows];
+    await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify(merged));
+    return merged;
+  } catch (error) {
+    console.warn('Failed to sync inflows from cloud:', error);
+    return await getInflows();
   }
 }
 

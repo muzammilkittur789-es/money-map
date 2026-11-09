@@ -28,6 +28,8 @@ import {
   updateCurrentUserName,
   updateFamilyInviteCode,
   updateFamilyAdminCode,
+  syncFamilyFromCloud,
+  syncInflowsFromCloud,
 } from '../services/storage';
 import { MemberAvatar } from './MemberAvatar';
 
@@ -295,6 +297,10 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
       onUpdateGroup(joined);
       setJoinCodeInput('');
       setIsAdmin(false);
+      try {
+        await syncFamilyFromCloud(joined.id);
+        await syncInflowsFromCloud(joined.id);
+      } catch {}
       Alert.alert(
         'Welcome to Family! 👨‍👩‍👧‍👦',
         `You have successfully joined "${joined.name}". All household expenses and budget limits are now synced.`
