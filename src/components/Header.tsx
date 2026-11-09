@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ExpenseScope, TimeFilter } from '../types';
@@ -83,8 +83,12 @@ export const Header: React.FC<HeaderProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Time Filter Pills */}
-      <View style={styles.timeFilterRow}>
+      {/* Time Filter Pills - Horizontally Scrollable */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.timeFilterScroll}
+      >
         {(['TODAY', 'WEEK', 'MONTH', 'YEAR', 'ALL'] as TimeFilter[]).map((filter) => {
           const labels: Record<TimeFilter, string> = {
             TODAY: 'Today',
@@ -106,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -187,9 +191,10 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '700',
   },
-  timeFilterRow: {
+  timeFilterScroll: {
     flexDirection: 'row',
     gap: 8,
+    paddingRight: 12,
   },
   timePill: {
     paddingHorizontal: 14,
