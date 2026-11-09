@@ -19,13 +19,14 @@ import {
   joinFamilyGroupByCode,
   saveSupabaseCredentials,
 } from '../services/supabase';
-import { CURRENT_USER, syncAllToCloud } from '../services/storage';
+import { CURRENT_USER, clearAllExpensesAndInflows, syncAllToCloud } from '../services/storage';
 
 interface FamilyGroupModalProps {
   visible: boolean;
   onClose: () => void;
   group: FamilyGroup;
   onUpdateGroup: (group: FamilyGroup) => void;
+  onRecordsCleared?: () => void;
 }
 
 export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
@@ -33,6 +34,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   onClose,
   group,
   onUpdateGroup,
+  onRecordsCleared,
 }) => {
   const [groupName, setGroupName] = useState(group.name);
   const [budget, setBudget] = useState(group.monthlyBudget.toString());
@@ -179,6 +181,39 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
         'Could not link family group. Please ensure Cloud Sync is connected and the invite code is correct.'
       );
     }
+  };
+
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleClearAllRecords = () => {
+    Alert.alert(
+      'Reset All Records? 🗑️',
+      'Are you sure you want to clear all existing expenses and net savings to start fresh from ₹0? This will wipe demo and test records permanently.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All Data',
+          style: 'destructive',
+          onPress: async () => {
+            setIsResetting(true);
+            const res = await clearAllExpensesAndInflows();
+            setIsResetting(false);
+            if (res.success) {
+              if (onRecordsCleared) {
+                onRecordsCleared();
+              }
+              onClose();
+              Alert.alert(
+                'Ledger Reset Successfully 🎉',
+                'All expenses, inflows, and net savings have been cleared. You are now starting from a fresh ₹0 slate!'
+              );
+            } else {
+              Alert.alert('Notice', 'Failed to clear some records. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -437,6 +472,27 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                   </View>
                 ))}
               </View>
+            </View>
+
+            {/* Reset & Start Fresh Section */}
+            <View style={styles.resetCard}>
+              <View style={styles.resetCardHeader}>
+                <Ionicons name="refresh-circle-outline" size={22} color="#DC2626" />
+                <Text style={styles.resetTitle}>Reset Ledger & Start Fresh</Text>
+              </View>
+              <Text style={styles.resetSubtitle}>
+                Wipe all existing expenses, inflows, and net savings from both this phone and the cloud to begin tracking on a fresh ₹0 slate.
+              </Text>
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={handleClearAllRecords}
+                disabled={isResetting}
+              >
+                <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.resetButtonText}>
+                  {isResetting ? 'Clearing Records...' : 'Clear All Records & Start Fresh'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <View style={{ height: 30 }} />
@@ -886,5 +942,50 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#15803D',
+  },
+  resetCard: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  resetCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  resetTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#991B1B',
+  },
+  resetSubtitle: {
+    fontSize: 12,
+    color: '#7F1D1D',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  resetButton: {
+    backgroundColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

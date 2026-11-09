@@ -507,6 +507,10 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setFamilyModalVisible(false)}
         group={familyGroup}
         onUpdateGroup={handleUpdateFamilyGroup}
+        onRecordsCleared={() => {
+          setExpenses([]);
+          setInflows([]);
+        }}
       />
 
       {/* Itemized Order & Invoice Scanner Modal */}

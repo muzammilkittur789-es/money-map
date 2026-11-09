@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Expense, FamilyGroup, FamilyMember, InflowItem } from '../types';
 import {
+  clearCloudFamilyRecords,
   fetchCloudFamilyExpenses,
   syncExpenseToCloud,
   syncFamilyGroupToCloud,
@@ -12,7 +13,7 @@ const STORAGE_KEYS = {
   INFLOWS: '@family_expense_tracker/inflows',
   FAMILY_GROUP: '@family_expense_tracker/family_group',
   USER_PROFILE: '@family_expense_tracker/user_profile',
-  INITIALIZED: '@family_expense_tracker/initialized_v2',
+  INITIALIZED: '@family_expense_tracker/initialized_v4_clean_slate',
 };
 
 export const CURRENT_USER: FamilyMember = {
@@ -51,140 +52,9 @@ const DEFAULT_FAMILY_GROUP: FamilyGroup = {
   createdAt: new Date().toISOString(),
 };
 
-const SEED_EXPENSES: Expense[] = [
-  {
-    id: 'exp_1',
-    title: 'Daily Fresh Milk & Bread',
-    amount: 140,
-    category: 'Groceries',
-    paymentMode: 'ONLINE',
-    upiProvider: 'PHONEPE',
-    payeeName: 'Mother Dairy / Local Booth',
-    payeeUpiId: 'dairy@upi',
-    scope: 'FAMILY',
-    spentBy: CURRENT_USER,
-    date: new Date().toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_2',
-    title: 'Vegetables & Fruits (Mandi)',
-    amount: 320,
-    category: 'Groceries',
-    paymentMode: 'CASH',
-    scope: 'FAMILY',
-    spentBy: CURRENT_USER,
-    date: new Date(Date.now() - 3600000 * 4).toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_3',
-    title: 'Auto Rickshaw to Office',
-    amount: 70,
-    category: 'Transport & Fuel',
-    paymentMode: 'CASH',
-    scope: 'PERSONAL',
-    spentBy: CURRENT_USER,
-    date: new Date(Date.now() - 3600000 * 8).toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_4',
-    title: 'Evening Tea & Snacks',
-    amount: 60,
-    category: 'Dining & Food',
-    paymentMode: 'ONLINE',
-    upiProvider: 'GPAY',
-    payeeName: 'Chai Point',
-    payeeUpiId: 'chaipoint@okaxis',
-    scope: 'PERSONAL',
-    spentBy: CURRENT_USER,
-    date: new Date(Date.now() - 3600000 * 20).toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_5',
-    title: 'Monthly High-Speed Wi-Fi Bill',
-    amount: 999,
-    category: 'Bills & Utilities',
-    paymentMode: 'ONLINE',
-    upiProvider: 'PAYTM',
-    payeeName: 'Airtel Broadband',
-    payeeUpiId: 'airtelbroadband@paytm',
-    scope: 'FAMILY',
-    spentBy: DEFAULT_MEMBERS[1],
-    date: new Date(Date.now() - 86400000 * 2).toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_6',
-    title: 'School Stationery & Notebooks',
-    amount: 450,
-    category: 'Education',
-    paymentMode: 'CASH',
-    scope: 'FAMILY',
-    spentBy: DEFAULT_MEMBERS[2],
-    date: new Date(Date.now() - 86400000 * 4).toISOString(),
-    status: 'COMPLETED',
-  },
-  {
-    id: 'exp_7',
-    title: 'Medicine & First Aid Kit',
-    amount: 680,
-    category: 'Health & Medical',
-    paymentMode: 'ONLINE',
-    upiProvider: 'PHONEPE',
-    payeeName: 'Apollo Pharmacy',
-    payeeUpiId: 'apollo@ybl',
-    scope: 'FAMILY',
-    spentBy: CURRENT_USER,
-    date: new Date(Date.now() - 86400000 * 6).toISOString(),
-    status: 'COMPLETED',
-  },
-];
+const SEED_EXPENSES: Expense[] = [];
 
-const SEED_INFLOWS: InflowItem[] = [
-  {
-    id: 'inf_1',
-    title: 'Monthly Salary Credit',
-    amount: 65000,
-    category: 'Salary',
-    channel: 'BANK_UPI',
-    scope: 'FAMILY',
-    receivedBy: CURRENT_USER,
-    date: new Date(Date.now() - 86400000 * 5).toISOString(),
-  },
-  {
-    id: 'inf_2',
-    title: 'Freelance Design Project',
-    amount: 12500,
-    category: 'Business & Freelance',
-    channel: 'BANK_UPI',
-    scope: 'PERSONAL',
-    receivedBy: CURRENT_USER,
-    date: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: 'inf_3',
-    title: 'Apartment Rental Income',
-    amount: 18000,
-    category: 'Rental Income',
-    channel: 'BANK_UPI',
-    scope: 'FAMILY',
-    receivedBy: DEFAULT_MEMBERS[1],
-    date: new Date(Date.now() - 86400000 * 6).toISOString(),
-  },
-  {
-    id: 'inf_4',
-    title: 'Cash Gift / Relative Visit',
-    amount: 2000,
-    category: 'Gifts & Pocket Money',
-    channel: 'CASH',
-    scope: 'FAMILY',
-    receivedBy: DEFAULT_MEMBERS[2],
-    date: new Date(Date.now() - 86400000 * 1).toISOString(),
-  },
-];
+const SEED_INFLOWS: InflowItem[] = [];
 
 export async function initializeStorage(): Promise<{
   expenses: Expense[];
@@ -194,25 +64,30 @@ export async function initializeStorage(): Promise<{
   try {
     const isInit = await AsyncStorage.getItem(STORAGE_KEYS.INITIALIZED);
     if (!isInit) {
-      await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(SEED_EXPENSES));
-      await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify(SEED_INFLOWS));
+      await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
+      await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify([]));
       await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(DEFAULT_FAMILY_GROUP));
       await AsyncStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
-      return { expenses: SEED_EXPENSES, inflows: SEED_INFLOWS, group: DEFAULT_FAMILY_GROUP };
+      try {
+        await clearCloudFamilyRecords(DEFAULT_FAMILY_GROUP.id);
+      } catch {
+        // Ignore if cloud is offline
+      }
+      return { expenses: [], inflows: [], group: DEFAULT_FAMILY_GROUP };
     }
 
     const rawExpenses = await AsyncStorage.getItem(STORAGE_KEYS.EXPENSES);
     const rawInflows = await AsyncStorage.getItem(STORAGE_KEYS.INFLOWS);
     const rawGroup = await AsyncStorage.getItem(STORAGE_KEYS.FAMILY_GROUP);
 
-    const expenses: Expense[] = rawExpenses ? JSON.parse(rawExpenses) : SEED_EXPENSES;
-    const inflows: InflowItem[] = rawInflows ? JSON.parse(rawInflows) : SEED_INFLOWS;
+    const expenses: Expense[] = rawExpenses ? JSON.parse(rawExpenses) : [];
+    const inflows: InflowItem[] = rawInflows ? JSON.parse(rawInflows) : [];
     const group: FamilyGroup = rawGroup ? JSON.parse(rawGroup) : DEFAULT_FAMILY_GROUP;
 
     return { expenses, inflows, group };
   } catch (error) {
     console.error('Failed to initialize storage:', error);
-    return { expenses: SEED_EXPENSES, inflows: SEED_INFLOWS, group: DEFAULT_FAMILY_GROUP };
+    return { expenses: [], inflows: [], group: DEFAULT_FAMILY_GROUP };
   }
 }
 
@@ -364,6 +239,21 @@ export async function syncAllToCloud(): Promise<{ success: boolean; count: numbe
   } catch (error) {
     console.warn('Sync all to cloud failed:', error);
     return { success: false, count: 0 };
+  }
+}
+
+export async function clearAllExpensesAndInflows(): Promise<{ success: boolean }> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
+    await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify([]));
+
+    // Also clear from Supabase cloud if connected!
+    const group = await getFamilyGroup();
+    await clearCloudFamilyRecords(group.id);
+    return { success: true };
+  } catch (error) {
+    console.warn('Failed to clear records:', error);
+    return { success: false };
   }
 }
 

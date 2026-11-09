@@ -300,6 +300,23 @@ export async function syncFamilyGroupToCloud(group: FamilyGroup): Promise<boolea
 }
 
 /**
+ * Clear all expenses and inflows in the cloud for this family group
+ */
+export async function clearCloudFamilyRecords(familyGroupId: string): Promise<boolean> {
+  const supabase = await getSupabase();
+  if (!supabase) return false;
+
+  try {
+    await supabase.from('expenses').delete().eq('family_group_id', familyGroupId);
+    await supabase.from('inflows').delete().eq('family_group_id', familyGroupId);
+    return true;
+  } catch (err) {
+    console.warn('Failed to clear cloud records:', err);
+    return false;
+  }
+}
+
+/**
  * Real-time WebSocket listener: Auto-refreshes the dashboard within 1 second
  * whenever any family member on any phone logs a new expense or inflow!
  */
