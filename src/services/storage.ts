@@ -235,7 +235,7 @@ export async function saveExpense(expense: Expense): Promise<Expense[]> {
     // Cloud sync in background for family pool
     if (expense.scope === 'FAMILY') {
       getFamilyGroup().then((group) => {
-        syncExpenseToCloud(expense, group.id);
+        syncExpenseToCloud(expense, group.id, group.name, group.inviteCode);
       });
     }
 
@@ -277,7 +277,7 @@ export async function saveInflow(item: InflowItem): Promise<InflowItem[]> {
     // Cloud sync in background for family pool
     if (item.scope === 'FAMILY') {
       getFamilyGroup().then((group) => {
-        syncInflowToCloud(item, group.id);
+        syncInflowToCloud(item, group.id, group.name, group.inviteCode);
       });
     }
 
@@ -340,6 +340,30 @@ export async function syncFamilyFromCloud(familyGroupId: string): Promise<Expens
   } catch (error) {
     console.warn('Failed to sync from cloud:', error);
     return await getExpenses();
+  }
+}
+
+export async function syncAllToCloud(): Promise<{ success: boolean; count: number }> {
+  try {
+    const group = await getFamilyGroup();
+    await syncFamilyGroupToCloud(group);
+
+    const expenses = await getExpenses();
+    const familyExpenses = expenses.filter((e) => e.scope === 'FAMILY');
+    for (const exp of familyExpenses) {
+      await syncExpenseToCloud(exp, group.id, group.name, group.inviteCode);
+    }
+
+    const inflows = await getInflows();
+    const familyInflows = inflows.filter((i) => i.scope === 'FAMILY');
+    for (const inf of familyInflows) {
+      await syncInflowToCloud(inf, group.id, group.name, group.inviteCode);
+    }
+
+    return { success: true, count: familyExpenses.length + familyInflows.length };
+  } catch (error) {
+    console.warn('Sync all to cloud failed:', error);
+    return { success: false, count: 0 };
   }
 }
 

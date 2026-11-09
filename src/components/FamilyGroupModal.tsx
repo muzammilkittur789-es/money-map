@@ -19,7 +19,7 @@ import {
   joinFamilyGroupByCode,
   saveSupabaseCredentials,
 } from '../services/supabase';
-import { CURRENT_USER } from '../services/storage';
+import { CURRENT_USER, syncAllToCloud } from '../services/storage';
 
 interface FamilyGroupModalProps {
   visible: boolean;
@@ -48,6 +48,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   const [supabaseKey, setSupabaseKey] = useState('');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -131,9 +132,27 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     if (success) {
       setIsCloudConnected(true);
       setShowCloudConfig(false);
-      Alert.alert('Connected! 🎉', 'Real-time family cloud sync is now active.');
+      const res = await syncAllToCloud();
+      Alert.alert(
+        'Connected & Synced! 🎉',
+        `Real-time cloud sync is now active. Uploaded ${res.count} existing family records to Supabase.`
+      );
     } else {
       Alert.alert('Connection Failed', 'Could not initialize cloud connection.');
+    }
+  };
+
+  const handleManualSyncAll = async () => {
+    setIsSyncingAll(true);
+    const res = await syncAllToCloud();
+    setIsSyncingAll(false);
+    if (res.success) {
+      Alert.alert(
+        'Sync Complete! ☁️',
+        `Successfully uploaded ${res.count} household expenses & inflows to Supabase.`
+      );
+    } else {
+      Alert.alert('Sync Error', 'Please verify your Supabase URL and Key in Setup Cloud.');
     }
   };
 
@@ -211,6 +230,24 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                   ? 'All family expenses sync live across all household phones automatically.'
                   : 'Connect to free Supabase cloud to synchronize expenses between multiple phones.'}
               </Text>
+
+              {/* Manual Upload Button when connected */}
+              {isCloudConnected && !showCloudConfig && (
+                <TouchableOpacity
+                  style={styles.syncNowBtn}
+                  onPress={handleManualSyncAll}
+                  disabled={isSyncingAll}
+                >
+                  {isSyncingAll ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-upload" size={15} color="#059669" />
+                      <Text style={styles.syncNowBtnText}>Upload All Family Records to Supabase Now</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
 
               {/* Cloud Credentials Form */}
               {showCloudConfig && (
@@ -509,6 +546,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     lineHeight: 18,
+  },
+  syncNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+    gap: 6,
+  },
+  syncNowBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
   },
   cloudForm: {
     marginTop: 12,

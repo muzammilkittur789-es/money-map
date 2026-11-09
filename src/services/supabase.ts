@@ -11,12 +11,20 @@ const STORAGE_KEYS = {
 // Default placeholder or configured credentials
 let supabaseClient: SupabaseClient | null = null;
 
+function sanitizeSupabaseUrl(rawUrl: string): string {
+  let cleaned = rawUrl.trim();
+  // Remove /rest/v1 or trailing slashes
+  cleaned = cleaned.replace(/\/rest\/v1\/?$/, '');
+  cleaned = cleaned.replace(/\/+$/, '');
+  return cleaned;
+}
+
 export async function getSupabaseCredentials(): Promise<{ url: string; anonKey: string } | null> {
   try {
     const url = await AsyncStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
     const anonKey = await AsyncStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
     if (url && anonKey) {
-      return { url, anonKey };
+      return { url: sanitizeSupabaseUrl(url), anonKey };
     }
     return null;
   } catch {
@@ -26,9 +34,12 @@ export async function getSupabaseCredentials(): Promise<{ url: string; anonKey: 
 
 export async function saveSupabaseCredentials(url: string, anonKey: string): Promise<boolean> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.SUPABASE_URL, url.trim());
-    await AsyncStorage.setItem(STORAGE_KEYS.SUPABASE_ANON_KEY, anonKey.trim());
-    supabaseClient = createClient(url.trim(), anonKey.trim(), {
+    const cleanUrl = sanitizeSupabaseUrl(url);
+    const cleanKey = anonKey.trim();
+
+    await AsyncStorage.setItem(STORAGE_KEYS.SUPABASE_URL, cleanUrl);
+    await AsyncStorage.setItem(STORAGE_KEYS.SUPABASE_ANON_KEY, cleanKey);
+    supabaseClient = createClient(cleanUrl, cleanKey, {
       auth: {
         persistSession: false,
       },
@@ -59,7 +70,12 @@ export async function getSupabase(): Promise<SupabaseClient | null> {
 /**
  * Upload an expense to the cloud family pool
  */
-export async function syncExpenseToCloud(expense: Expense, familyGroupId: string): Promise<boolean> {
+export async function syncExpenseToCloud(
+  expense: Expense,
+  familyGroupId: string,
+  groupName = 'Our Family',
+  inviteCode = 'FAM786'
+): Promise<boolean> {
   // Only sync if expense is designated for the family pool
   if (expense.scope !== 'FAMILY') return true;
 
@@ -67,6 +83,14 @@ export async function syncExpenseToCloud(expense: Expense, familyGroupId: string
   if (!supabase) return false;
 
   try {
+    // 1. Ensure the parent family group exists in DB first (avoids foreign key constraint error)
+    await supabase.from('family_groups').upsert({
+      id: familyGroupId,
+      name: groupName,
+      invite_code: inviteCode,
+    });
+
+    // 2. Upsert the expense
     const { error } = await supabase.from('expenses').upsert({
       id: expense.id,
       family_group_id: familyGroupId,
@@ -78,9 +102,9 @@ export async function syncExpenseToCloud(expense: Expense, familyGroupId: string
       payee_name: expense.payeeName,
       payee_upi_id: expense.payeeUpiId,
       scope: expense.scope,
-      spent_by_id: expense.spentBy.id,
-      spent_by_name: expense.spentBy.name,
-      spent_by_avatar: expense.spentBy.avatar,
+      spent_by_id: expense.spentBy?.id || 'user_1',
+      spent_by_name: expense.spentBy?.name || 'Myself',
+      spent_by_avatar: expense.spentBy?.avatar || '👤',
       notes: expense.notes,
       date: expense.date,
     });
@@ -99,13 +123,25 @@ export async function syncExpenseToCloud(expense: Expense, familyGroupId: string
 /**
  * Upload an inflow item to the cloud family pool
  */
-export async function syncInflowToCloud(inflow: InflowItem, familyGroupId: string): Promise<boolean> {
+export async function syncInflowToCloud(
+  inflow: InflowItem,
+  familyGroupId: string,
+  groupName = 'Our Family',
+  inviteCode = 'FAM786'
+): Promise<boolean> {
   if (inflow.scope !== 'FAMILY') return true;
 
   const supabase = await getSupabase();
   if (!supabase) return false;
 
   try {
+    // Ensure parent family group exists
+    await supabase.from('family_groups').upsert({
+      id: familyGroupId,
+      name: groupName,
+      invite_code: inviteCode,
+    });
+
     const { error } = await supabase.from('inflows').upsert({
       id: inflow.id,
       family_group_id: familyGroupId,
@@ -114,9 +150,9 @@ export async function syncInflowToCloud(inflow: InflowItem, familyGroupId: strin
       category: inflow.category,
       channel: inflow.channel,
       scope: inflow.scope,
-      received_by_id: inflow.receivedBy.id,
-      received_by_name: inflow.receivedBy.name,
-      received_by_avatar: inflow.receivedBy.avatar,
+      received_by_id: inflow.receivedBy?.id || 'user_1',
+      received_by_name: inflow.receivedBy?.name || 'Myself',
+      received_by_avatar: inflow.receivedBy?.avatar || '👤',
       notes: inflow.notes,
       date: inflow.date,
     });
