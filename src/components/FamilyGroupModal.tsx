@@ -22,14 +22,17 @@ import {
   releaseAdminSession,
   saveSupabaseCredentials,
 } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   CURRENT_USER,
+  SOLO_GROUP,
   addFamilyMember,
   clearAllExpensesAndInflows,
   syncAllToCloud,
   deleteFamilyMember,
   getDeviceId,
   getDeviceMemberId,
+  leaveFamilyGroup,
   saveFamilyGroup,
   syncFamilyGroupFromCloud,
   updateCurrentUserName,
@@ -392,6 +395,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     setIsJoining(false);
 
     if (joined) {
+      await AsyncStorage.setItem('@money_map/family_linked', 'true');
       await saveFamilyGroup(joined);
       onUpdateGroup(joined);
       setJoinCodeInput('');
@@ -410,6 +414,29 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
         'Could not link family group. Please ensure the 8-character code starting with FAM is correct.'
       );
     }
+  };
+
+  const handleLeaveFamily = () => {
+    Alert.alert(
+      'Disconnect from Family Group? 🚪',
+      'Are you sure you want to disconnect? You will be removed from the household list and returned to personal mode until you enter the family code again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Family',
+          style: 'destructive',
+          onPress: async () => {
+            const solo = await leaveFamilyGroup();
+            onUpdateGroup(solo);
+            setIsAdmin(false);
+            Alert.alert(
+              'Disconnected 👤',
+              'You have left the family group. You can re-join anytime by entering the 8-digit family code.'
+            );
+          },
+        },
+      ]
+    );
   };
 
   const [isResetting, setIsResetting] = useState(false);
@@ -811,6 +838,24 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 )}
               </View>
 
+              {/* Prominent Household Admin Banner so everyone sees who the admin is */}
+              {group.id !== 'solo_group' && (
+                <View style={styles.adminSummaryCard}>
+                  <View style={styles.adminSummaryIcon}>
+                    <Ionicons name="shield-checkmark" size={20} color="#D97706" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.adminSummaryLabel}>Household Admin</Text>
+                    <Text style={styles.adminSummaryName}>
+                      {group.members.find((m) => m.role === 'HEAD')?.name || 'Muzammil'}
+                    </Text>
+                  </View>
+                  <View style={styles.adminBadgePill}>
+                    <Text style={styles.adminBadgePillText}>👑 Admin</Text>
+                  </View>
+                </View>
+              )}
+
               {/* Add Member Form (Admin Only) */}
               {isAdmin && isAddingMember && (
                 <View style={styles.addMemberBox}>
@@ -840,6 +885,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               <View style={styles.membersList}>
                 {group.members.map((member) => {
                   const isCurrent = member.isCurrentUser || member.id === CURRENT_USER.id;
+                  const isHead = member.role === 'HEAD';
                   return (
                     <View key={member.id} style={styles.memberCard}>
                       <View style={styles.memberLeft}>
@@ -883,9 +929,17 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                               )}
                             </View>
                           )}
-                          <Text style={styles.memberRole}>
-                            {member.role === 'HEAD' ? 'Household Admin' : 'Family Member'}
-                          </Text>
+                          <View style={styles.roleTagRow}>
+                            {isHead ? (
+                              <View style={styles.adminRoleTag}>
+                                <Text style={styles.adminRoleTagText}>👑 Admin</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.memberRoleTag}>
+                                <Text style={styles.memberRoleTagText}>👤 Member</Text>
+                              </View>
+                            )}
+                          </View>
                         </View>
                       </View>
 
@@ -906,6 +960,19 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 })}
               </View>
             </View>
+
+            {/* Leave Family Group (For non-admin members) */}
+            {!isAdmin && group.id !== 'solo_group' && (
+              <View style={styles.leaveGroupCard}>
+                <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveFamily}>
+                  <Ionicons name="log-out-outline" size={16} color="#DC2626" />
+                  <Text style={styles.leaveGroupBtnText}>Leave Family Group</Text>
+                </TouchableOpacity>
+                <Text style={styles.leaveGroupSub}>
+                  Disconnects this phone from the family ledger. You can re-join anytime using the 8-digit code.
+                </Text>
+              </View>
+            )}
 
             {/* Reset & Start Fresh Section (Admin Only) */}
             {isAdmin && (
@@ -930,7 +997,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               </View>
             )}
 
-            <View style={{ height: 30 }} />
+            <View style={{ height: 60 }} />
           </ScrollView>
         </View>
       </View>
@@ -1354,29 +1421,113 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  memberRole: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  memberStatusBadge: {
+  adminSummaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    gap: 12,
   },
-  greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
+  adminSummaryIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statusText: {
-    fontSize: 10,
+  adminSummaryLabel: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#15803D',
+    color: '#92400E',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminSummaryName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#78350F',
+    marginTop: 1,
+  },
+  adminBadgePill: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  adminBadgePillText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  roleTagRow: {
+    marginTop: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  adminRoleTag: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  adminRoleTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  memberRoleTag: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  memberRoleTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  leaveGroupCard: {
+    marginTop: 20,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+  },
+  leaveGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  leaveGroupBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  leaveGroupSub: {
+    fontSize: 11,
+    color: '#991B1B',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 16,
   },
   resetCard: {
     backgroundColor: '#FEF2F2',

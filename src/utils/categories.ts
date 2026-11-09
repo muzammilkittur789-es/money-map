@@ -57,12 +57,6 @@ export const CATEGORIES: CategoryMeta[] = [
     bgColor: '#EEF2FF',
   },
   {
-    name: 'Leisure & Entertainment',
-    icon: 'game-controller-outline',
-    color: '#14B8A6', // Teal
-    bgColor: '#F0FDFA',
-  },
-  {
     name: 'Other',
     icon: 'ellipsis-horizontal-circle-outline',
     color: '#64748B', // Slate

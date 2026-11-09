@@ -13,7 +13,6 @@ export type ExpenseCategory =
   | 'Health & Medical'
   | 'Education'
   | 'Home & Maintenance'
-  | 'Leisure & Entertainment'
   | 'Other';
 
 export type InflowCategory =

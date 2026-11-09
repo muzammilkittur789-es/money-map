@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -27,21 +27,56 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
   const [manualUpi, setManualUpi] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [torch, setTorch] = useState(false);
+  const lastScannedTime = useRef(0);
+
+  // Re-arm camera and reset scanning state every time modal opens or closes
+  useEffect(() => {
+    if (visible) {
+      setScanned(false);
+      setManualUpi('');
+      setShowManualInput(false);
+      setTorch(false);
+      lastScannedTime.current = 0;
+    } else {
+      setScanned(false);
+      setTorch(false);
+    }
+  }, [visible]);
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
+    const now = Date.now();
+    // Prevent duplicate rapid-fire scanning within 1.5 seconds
+    if (scanned || now - lastScannedTime.current < 1500) return;
+    lastScannedTime.current = now;
     setScanned(true);
 
     const parsed = parseUpiQr(data);
     if (parsed && parsed.payeeUpiId) {
       onScanSuccess(parsed);
+      // Auto-reset scanned state after a short delay so user can scan again without restarting app
+      setTimeout(() => {
+        setScanned(false);
+      }, 1200);
     } else {
       Alert.alert(
         'QR Code Detected',
         `Scanned: ${data.slice(0, 80)}...\n\nThis does not appear to be a standard UPI payment QR code.`,
-        [{ text: 'Try Again', onPress: () => setScanned(false) }]
+        [
+          {
+            text: 'Try Again',
+            onPress: () => {
+              setScanned(false);
+              lastScannedTime.current = 0;
+            },
+          },
+        ]
       );
     }
+  };
+
+  const handleClose = () => {
+    setScanned(false);
+    onClose();
   };
 
   const handleManualSubmit = () => {
@@ -66,13 +101,13 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.headerButton}>
+          <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
             <Ionicons name="close" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Scan UPI QR Code</Text>
@@ -106,6 +141,7 @@ export const ScanModal: React.FC<ScanModalProps> = ({ visible, onClose, onScanSu
         ) : (
           <View style={styles.cameraContainer}>
             <CameraView
+              key={visible ? 'camera-scanner-active' : 'camera-scanner-inactive'}
               style={StyleSheet.absoluteFill}
               enableTorch={torch}
               barcodeScannerSettings={{

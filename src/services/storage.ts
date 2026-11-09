@@ -21,7 +21,8 @@ const STORAGE_KEYS = {
   USER_PROFILE: '@family_expense_tracker/user_profile',
   DEVICE_ID: '@money_map/device_id',
   DEVICE_MEMBER_ID: '@money_map/device_member_id',
-  INITIALIZED: '@family_expense_tracker/initialized_v6_universal_admin',
+  FAMILY_LINKED: '@money_map/family_linked',
+  INITIALIZED: '@family_expense_tracker/initialized_v7_clean_solo',
 };
 
 export async function getDeviceId(): Promise<string> {
@@ -62,30 +63,26 @@ export async function getDeviceMemberId(): Promise<string> {
 
 export const CURRENT_USER: FamilyMember = {
   id: 'user_1',
-  name: 'Myself',
+  name: 'Muzammil',
   role: 'HEAD',
-  avatar: '👨‍💼',
+  avatar: 'default',
   color: '#059669', // Emerald
   isCurrentUser: true,
 };
 
 const DEFAULT_MEMBERS: FamilyMember[] = [
   CURRENT_USER,
-  {
-    id: 'user_2',
-    name: 'Spouse',
-    role: 'MEMBER',
-    avatar: '👩‍💼',
-    color: '#8B5CF6', // Purple
-  },
-  {
-    id: 'user_3',
-    name: 'Kid (Allowance)',
-    role: 'MEMBER',
-    avatar: '👦',
-    color: '#F59E0B', // Amber
-  },
 ];
+
+export const SOLO_GROUP: FamilyGroup = {
+  id: 'solo_group',
+  name: 'Personal Space (Not in Family)',
+  inviteCode: '',
+  adminCode: '',
+  monthlyBudget: 0,
+  members: [CURRENT_USER],
+  createdAt: new Date().toISOString(),
+};
 
 const DEFAULT_FAMILY_GROUP: FamilyGroup = {
   id: 'group_home_1',
@@ -93,7 +90,16 @@ const DEFAULT_FAMILY_GROUP: FamilyGroup = {
   inviteCode: 'FAM78601',
   adminCode: 'FAM78699',
   monthlyBudget: 35000,
-  members: DEFAULT_MEMBERS,
+  members: [
+    {
+      id: 'user_1',
+      name: 'Muzammil',
+      role: 'HEAD',
+      avatar: 'default',
+      color: '#059669',
+      isCurrentUser: true,
+    },
+  ],
   createdAt: new Date().toISOString(),
 };
 
@@ -124,32 +130,37 @@ export async function initializeStorage(): Promise<{
 
     const isInit = await AsyncStorage.getItem(STORAGE_KEYS.INITIALIZED);
     if (!isInit) {
+      // Determine if this is the household admin device or a new member install
+      const isAdminDevice =
+        CURRENT_USER.id === 'user_1' || CURRENT_USER.name?.toLowerCase() === 'muzammil';
+
+      const initialGroup = isAdminDevice ? DEFAULT_FAMILY_GROUP : SOLO_GROUP;
       await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
       await AsyncStorage.setItem(STORAGE_KEYS.INFLOWS, JSON.stringify([]));
-      await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(DEFAULT_FAMILY_GROUP));
+      await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(initialGroup));
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.FAMILY_LINKED,
+        isAdminDevice ? 'true' : 'false'
+      );
       await AsyncStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
-      return { expenses: [], inflows: [], group: DEFAULT_FAMILY_GROUP };
+      return { expenses: [], inflows: [], group: initialGroup };
     }
 
     const rawExpenses = await AsyncStorage.getItem(STORAGE_KEYS.EXPENSES);
     const rawInflows = await AsyncStorage.getItem(STORAGE_KEYS.INFLOWS);
     const rawGroup = await AsyncStorage.getItem(STORAGE_KEYS.FAMILY_GROUP);
+    const isFamilyLinked = await AsyncStorage.getItem(STORAGE_KEYS.FAMILY_LINKED);
 
     const expenses: Expense[] = rawExpenses ? JSON.parse(rawExpenses) : [];
     const inflows: InflowItem[] = rawInflows ? JSON.parse(rawInflows) : [];
-    const group: FamilyGroup = rawGroup ? JSON.parse(rawGroup) : DEFAULT_FAMILY_GROUP;
+    let group: FamilyGroup = rawGroup ? JSON.parse(rawGroup) : DEFAULT_FAMILY_GROUP;
 
-    // Ensure members list is never empty
-    if (!group.members || group.members.length === 0) {
-      group.members = DEFAULT_MEMBERS;
-    }
+    // If device is not admin and has not explicitly joined via invite code, keep it in solo mode
+    const isAdminDevice =
+      CURRENT_USER.id === 'user_1' || CURRENT_USER.name?.toLowerCase() === 'muzammil';
 
-    // Ensure 8-digit invite code starting with FAM and admin code exist
-    if (!group.adminCode) {
-      group.adminCode = 'FAM78699';
-    }
-    if (!group.inviteCode || group.inviteCode === 'FAM786' || group.inviteCode.length < 8) {
-      group.inviteCode = 'FAM78601';
+    if (!isAdminDevice && isFamilyLinked !== 'true') {
+      group = SOLO_GROUP;
     }
 
     return { expenses, inflows, group };
@@ -315,15 +326,14 @@ export async function syncInflowsFromCloud(familyGroupId: string): Promise<Inflo
  * Synchronize Family Group metadata & members list from Supabase cloud
  */
 export async function syncFamilyGroupFromCloud(familyGroupId: string): Promise<FamilyGroup> {
+  if (!familyGroupId || familyGroupId === 'solo_group') {
+    return await getFamilyGroup();
+  }
+
   try {
     const cloudGroup = await fetchCloudFamilyGroup(familyGroupId);
     if (cloudGroup) {
       const localGroup = await getFamilyGroup();
-
-      // Ensure members list is preserved and synced
-      const cloudMemberIds = new Set(cloudGroup.members.map((m) => m.id));
-      const extraLocalMembers = (localGroup.members || []).filter((m) => !cloudMemberIds.has(m.id));
-      const mergedMembers = [...cloudGroup.members, ...extraLocalMembers];
 
       const mergedGroup: FamilyGroup = {
         ...localGroup,
@@ -335,7 +345,7 @@ export async function syncFamilyGroupFromCloud(familyGroupId: string): Promise<F
         activeAdminName: cloudGroup.activeAdminName,
         activeAdminAt: cloudGroup.activeAdminAt,
         monthlyBudget: cloudGroup.monthlyBudget || localGroup.monthlyBudget,
-        members: mergedMembers.length > 0 ? mergedMembers : localGroup.members,
+        members: cloudGroup.members.length > 0 ? cloudGroup.members : [CURRENT_USER],
       };
 
       await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(mergedGroup));
@@ -345,6 +355,19 @@ export async function syncFamilyGroupFromCloud(familyGroupId: string): Promise<F
     console.warn('Failed to sync family group from cloud:', err);
   }
   return await getFamilyGroup();
+}
+
+/**
+ * Disconnect/Leave family group (returns to personal solo ledger)
+ */
+export async function leaveFamilyGroup(): Promise<FamilyGroup> {
+  try {
+    const devMemberId = await getDeviceMemberId();
+    await deleteFamilyMemberFromCloud(devMemberId);
+    await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_LINKED, 'false');
+    await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(SOLO_GROUP));
+  } catch {}
+  return SOLO_GROUP;
 }
 
 export async function syncAllToCloud(): Promise<{ success: boolean; count: number }> {

@@ -392,7 +392,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={{ height: 130 }} />
+          <View style={{ height: 190 }} />
         </ScrollView>
       ) : (
         <InflowSavingsView
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   },
   actionDock: {
     position: 'absolute',
-    bottom: 74,
+    bottom: 84,
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -724,8 +724,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 10,
+    paddingBottom: 16,
     paddingHorizontal: 20,
   },
   navTab: {

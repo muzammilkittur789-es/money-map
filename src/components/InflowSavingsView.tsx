@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 30,
+    paddingBottom: 190,
   },
   heroCard: {
     backgroundColor: '#0F172A',
