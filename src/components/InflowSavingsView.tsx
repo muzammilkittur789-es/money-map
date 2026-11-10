@@ -75,7 +75,10 @@ export const InflowSavingsView: React.FC<InflowSavingsViewProps> = ({
         <View style={styles.heroHeader}>
           <View style={styles.heroLabelContainer}>
             <Text style={styles.heroLabel} numberOfLines={1} ellipsizeMode="tail">
-              NET SAVINGS • {periodLabel.toUpperCase()}
+              NET SAVINGS
+            </Text>
+            <Text style={styles.heroPeriodPill} numberOfLines={1}>
+              • {periodLabel}
             </Text>
           </View>
           <View
@@ -240,23 +243,28 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: '#0F172A',
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
     marginBottom: 20,
+    overflow: 'hidden',
   },
   heroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
   heroLabelContainer: {
     flex: 1,
     minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginRight: 8,
   },
   heroLabel: {
@@ -264,6 +272,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '700',
     letterSpacing: 0.8,
+  },
+  heroPeriodPill: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
   },
   scopeBadge: {
     flexDirection: 'row',

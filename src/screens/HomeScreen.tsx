@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -52,7 +51,7 @@ import { ReceiptScannerModal } from '../components/ReceiptScannerModal';
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 18 : 10) + 4;
-  const dockBottom = Math.max(108, insets.bottom + 92);
+  const dockBottom = Math.max(82, insets.bottom + 72);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -413,45 +412,48 @@ export const HomeScreen: React.FC = () => {
         />
       )}
 
-      {/* Floating Action Dock for Expenses Tab */}
+      {/* Floating Action Dock (Contoured Pod with Glowing Emerald QR Orb) */}
       {activeTab === 'EXPENSES' ? (
-        <View style={[styles.actionDock, { bottom: dockBottom }]}>
+        <View style={[styles.actionDockPod, { bottom: dockBottom }]}>
           <TouchableOpacity
-            style={styles.dockButtonSecondary}
+            style={styles.dockPillSide}
             onPress={handleOpenCashEntry}
-            activeOpacity={0.8}
+            activeOpacity={0.75}
           >
-            <Ionicons name="cash" size={18} color="#059669" />
-            <Text style={styles.dockButtonSecondaryText}>+ Cash</Text>
+            <Text style={styles.dockPillText}>+ Cash</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.dockButtonPrimary}
+            style={styles.dockOrbGlowWrapper}
             onPress={() => setScanModalVisible(true)}
             activeOpacity={0.85}
           >
-            <Ionicons name="qr-code" size={24} color="#FFFFFF" />
-            <Text style={styles.dockButtonPrimaryText}>Scan & Pay</Text>
+            <View style={styles.dockOrbGlowRing}>
+              <View style={styles.dockOrbCenter}>
+                <Ionicons name="qr-code" size={24} color="#FFFFFF" />
+              </View>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.dockButtonSecondary}
+            style={styles.dockPillSide}
             onPress={() => setReceiptModalVisible(true)}
-            activeOpacity={0.8}
+            activeOpacity={0.75}
           >
-            <Ionicons name="document-text" size={18} color="#2563EB" />
-            <Text style={styles.dockButtonSecondaryText}>+ Invoice</Text>
+            <Text style={styles.dockPillText}>+ Invoice</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[styles.actionDock, { bottom: dockBottom }]}>
+        <View style={[styles.actionDockPod, { bottom: dockBottom }]}>
           <TouchableOpacity
-            style={[styles.dockButtonPrimary, { backgroundColor: '#16A34A' }]}
+            style={styles.dockInflowFull}
             onPress={() => setAddInflowVisible(true)}
             activeOpacity={0.85}
           >
-            <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-            <Text style={styles.dockButtonPrimaryText}>+ Add Money Received</Text>
+            <View style={styles.dockInflowIconOrb}>
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+            </View>
+            <Text style={styles.dockInflowText}>+ Add Money Received</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -674,56 +676,98 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  actionDock: {
+  actionDockPod: {
     position: 'absolute',
-    bottom: 84,
     left: 20,
     right: 20,
+    height: 62,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 31,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  dockButtonPrimary: {
-    flex: 1.6,
-    flexDirection: 'row',
+  dockPillSide: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#059669',
-    paddingVertical: 14,
-    borderRadius: 20,
-    gap: 8,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+  },
+  dockPillText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    letterSpacing: -0.2,
+  },
+  dockOrbGlowWrapper: {
+    marginHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockOrbGlowRing: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: 'rgba(16, 185, 129, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
     shadowRadius: 10,
     elevation: 6,
   },
-  dockButtonPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
+  dockOrbCenter: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 8,
   },
-  dockButtonSecondary: {
+  dockInflowFull: {
     flex: 1,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#059669',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    borderRadius: 20,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    gap: 8,
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  dockButtonSecondaryText: {
-    color: '#1E293B',
-    fontSize: 14,
+  dockInflowIconOrb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockInflowText: {
+    fontSize: 15,
     fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   bottomNav: {
     flexDirection: 'row',

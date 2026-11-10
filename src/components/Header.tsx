@@ -29,14 +29,14 @@ export const Header: React.FC<HeaderProps> = ({
     familyName.includes('Personal Space') ||
     familyName.toLowerCase().includes('not in family');
 
-  const displayedBadgeName = isSoloOrUnlinked ? 'Family Hub' : familyName;
+  const displayedBadgeName = isSoloOrUnlinked ? 'Personal' : (familyName.length > 12 ? familyName.substring(0, 10) + '…' : familyName);
 
   const getSubtitle = () => {
     if (currentScope === 'PERSONAL') {
-      return 'Private Expense Ledger';
+      return 'Private Ledger';
     }
     if (isSoloOrUnlinked) {
-      return 'Household Shared Ledger';
+      return 'Household Shared';
     }
     return `${familyName} Ledger`;
   };
@@ -148,22 +148,26 @@ export const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+    width: '100%',
+    overflow: 'hidden',
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    width: '100%',
   },
   topRowLeft: {
     flex: 1,
     minWidth: 0,
-    marginRight: 12,
+    flexShrink: 1,
+    marginRight: 8,
   },
   appTitle: {
     fontSize: 22,
@@ -182,13 +186,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#A7F3D0',
-    gap: 5,
-    maxWidth: 145,
+    gap: 4,
+    maxWidth: 120,
     flexShrink: 0,
   },
   familyBadgePrompt: {
@@ -196,7 +200,7 @@ const styles = StyleSheet.create({
     borderColor: '#99F6E4',
   },
   familyBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#065F46',
     flexShrink: 1,
@@ -222,9 +226,9 @@ const styles = StyleSheet.create({
   },
   scopeTabActive: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -234,7 +238,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   scopeTabTextActive: {
-    color: '#0F172A',
+    color: '#065F46',
     fontWeight: '700',
   },
   timeFilterScroll: {
@@ -251,8 +255,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   timePillActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   timePillText: {
     fontSize: 12,
@@ -261,5 +270,6 @@ const styles = StyleSheet.create({
   },
   timePillTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
