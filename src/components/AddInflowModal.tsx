@@ -21,6 +21,7 @@ import {
 } from '../types';
 import { INFLOW_CATEGORIES } from '../utils/inflowCategories';
 import { MemberAvatar } from './MemberAvatar';
+import { DatePickerSection } from './DatePickerSection';
 
 interface AddInflowModalProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
   const [scope, setScope] = useState<ExpenseScope>('FAMILY');
   const [selectedRecipient, setSelectedRecipient] = useState<FamilyMember>(currentUser);
   const [notes, setNotes] = useState('');
+  const [inflowDate, setInflowDate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (visible) {
@@ -53,6 +55,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
       setChannel('BANK_UPI');
       setScope('FAMILY');
       setSelectedRecipient(currentUser);
+      setInflowDate(new Date());
     }
   }, [visible]);
 
@@ -78,7 +81,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
       channel,
       scope,
       receivedBy: selectedRecipient,
-      date: new Date().toISOString(),
+      date: inflowDate.toISOString(),
       notes: notes.trim() || undefined,
     };
 
@@ -145,6 +148,13 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
                 onChangeText={setTitle}
               />
             </View>
+
+            {/* Date Selection */}
+            <DatePickerSection
+              value={inflowDate}
+              onChange={setInflowDate}
+              label="Date Received"
+            />
 
             {/* Scope: Personal vs Family */}
             <View style={styles.fieldSection}>

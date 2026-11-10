@@ -266,7 +266,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
       setAdminCodeInput('');
       if (res.group) onUpdateGroup(res.group);
       Alert.alert(
-        'Admin Access Granted 👑',
+        'Admin Access Granted',
         'You are now logged in as the universal household admin. Admin controls are active on this phone.'
       );
     } else {
@@ -293,7 +293,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                   setShowAdminUnlock(false);
                   setAdminCodeInput('');
                   if (forceRes.group) onUpdateGroup(forceRes.group);
-                  Alert.alert('Session Transferred 👑', 'Admin session has been transferred to this phone.');
+                  Alert.alert('Session Transferred', 'Admin session has been transferred to this phone.');
                 } else {
                   Alert.alert('Notice', forceRes.message || 'Could not transfer admin session.');
                 }
@@ -502,7 +502,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.roleBannerTitle, { color: isAdmin ? '#92400E' : '#1E40AF' }]}>
                     {isAdmin
-                      ? '👑 Household Admin Active (This Phone)'
+                      ? 'Household Admin Active (This Phone)'
                       : group.activeAdminDeviceId && group.activeAdminDeviceId !== deviceId
                       ? '🔒 Universal Admin In Use'
                       : '👤 Family Member Mode'}
@@ -852,7 +852,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                     </Text>
                   </View>
                   <View style={styles.adminBadgePill}>
-                    <Text style={styles.adminBadgePillText}>👑 Admin</Text>
+                    <Text style={styles.adminBadgePillText}>Admin</Text>
                   </View>
                 </View>
               )}
@@ -933,7 +933,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                           <View style={styles.roleTagRow}>
                             {isHead ? (
                               <View style={styles.adminRoleTag}>
-                                <Text style={styles.adminRoleTagText}>👑 Admin</Text>
+                                <Text style={styles.adminRoleTagText}>Admin</Text>
                               </View>
                             ) : (
                               <View style={styles.memberRoleTag}>

@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Expense, ExpenseCategory, ExpenseScope, FamilyMember, PaymentMode } from '../types';
 import { DEMO_RECEIPTS, ParsedItem } from '../utils/receiptParser';
 import { getCategoryMeta } from '../utils/categories';
+import { DatePickerSection } from './DatePickerSection';
 
 interface ReceiptScannerModalProps {
   visible: boolean;
@@ -39,6 +40,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const [scope, setScope] = useState<ExpenseScope>('FAMILY');
   const [selectedSpender, setSelectedSpender] = useState<FamilyMember>(currentUser);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('ONLINE');
+  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -149,7 +151,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       payeeName: storeName,
       scope,
       spentBy: selectedSpender,
-      date: new Date().toISOString(),
+      date: invoiceDate.toISOString(),
       notes: `Imported from ${storeName}`,
       status: 'COMPLETED',
     }));
@@ -356,6 +358,13 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {/* Date Selection */}
+                <DatePickerSection
+                  value={invoiceDate}
+                  onChange={setInvoiceDate}
+                  label="Invoice / Order Date"
+                />
               </>
             )}
 

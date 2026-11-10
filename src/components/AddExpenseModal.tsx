@@ -24,6 +24,7 @@ import {
 import { CATEGORIES } from '../utils/categories';
 import { launchPaymentApp } from '../utils/upi';
 import { MemberAvatar } from './MemberAvatar';
+import { DatePickerSection } from './DatePickerSection';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -52,10 +53,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [scope, setScope] = useState<ExpenseScope>('FAMILY');
   const [selectedSpender, setSelectedSpender] = useState<FamilyMember>(currentUser);
   const [notes, setNotes] = useState('');
+  const [expenseDate, setExpenseDate] = useState<Date>(new Date());
 
   // Whenever scannedData or modal visibility changes, initialize state
   useEffect(() => {
     if (visible) {
+      setExpenseDate(new Date());
       if (scannedData) {
         setTitle(scannedData.payeeName || 'UPI Merchant');
         if (scannedData.amount) {
@@ -102,7 +105,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       payeeName: scannedData?.payeeName || expenseTitle,
       scope,
       spentBy: selectedSpender,
-      date: new Date().toISOString(),
+      date: expenseDate.toISOString(),
       notes: notes.trim() || undefined,
       status: 'COMPLETED',
     };
@@ -195,6 +198,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 onChangeText={setTitle}
               />
             </View>
+
+            {/* Date Selection */}
+            <DatePickerSection
+              value={expenseDate}
+              onChange={setExpenseDate}
+              label="Transaction Date"
+            />
 
             {/* Scope Selector: Personal vs Family */}
             <View style={styles.fieldSection}>
