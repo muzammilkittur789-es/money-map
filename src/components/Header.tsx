@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ExpenseScope, TimeFilter } from '../types';
 
@@ -21,9 +20,6 @@ export const Header: React.FC<HeaderProps> = ({
   familyName,
   onOpenFamilyModal,
 }) => {
-  const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? 38 : 20) + 8;
-
   const isSoloOrUnlinked =
     !familyName ||
     familyName.includes('Personal Space') ||
@@ -42,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
+    <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topRow}>
         <View style={styles.topRowLeft}>
@@ -148,9 +144,9 @@ export const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     width: '100%',

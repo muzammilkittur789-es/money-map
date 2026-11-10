@@ -50,8 +50,9 @@ import { ReceiptScannerModal } from '../components/ReceiptScannerModal';
 
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 18 : 10) + 4;
-  const dockBottom = Math.max(82, insets.bottom + 72);
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10);
+  const bottomNavPadding = bottomInset;
+  const dockBottom = 54 + bottomNavPadding + 14;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -293,7 +294,7 @@ export const HomeScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Top Header with Scope Switcher & Time Filter */}
@@ -412,7 +413,47 @@ export const HomeScreen: React.FC = () => {
         />
       )}
 
-      {/* Floating Action Dock (Contoured Pod with Glowing Emerald QR Orb) */}
+      {/* Bottom Navigation Bar */}
+      <View style={[styles.bottomNav, { paddingBottom: bottomNavPadding }]}>
+        <TouchableOpacity
+          style={[styles.navTab, activeTab === 'EXPENSES' && styles.navTabActive]}
+          onPress={() => setActiveTab('EXPENSES')}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={activeTab === 'EXPENSES' ? 'receipt' : 'receipt-outline'}
+            size={22}
+            color={activeTab === 'EXPENSES' ? '#059669' : '#64748B'}
+          />
+          <Text
+            style={[styles.navTabText, activeTab === 'EXPENSES' && styles.navTabTextActive]}
+          >
+            Expenses
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navTab, activeTab === 'INFLOW_SAVINGS' && styles.navTabActive]}
+          onPress={() => setActiveTab('INFLOW_SAVINGS')}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={activeTab === 'INFLOW_SAVINGS' ? 'trending-up' : 'trending-up-outline'}
+            size={22}
+            color={activeTab === 'INFLOW_SAVINGS' ? '#059669' : '#64748B'}
+          />
+          <Text
+            style={[
+              styles.navTabText,
+              activeTab === 'INFLOW_SAVINGS' && styles.navTabTextActive,
+            ]}
+          >
+            Money In & Savings
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Floating Action Dock (Rendered on top of BottomNav with zIndex: 999) */}
       {activeTab === 'EXPENSES' ? (
         <View style={[styles.actionDockPod, { bottom: dockBottom }]}>
           <TouchableOpacity
@@ -457,46 +498,6 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Bottom Navigation Bar */}
-      <View style={[styles.bottomNav, { paddingBottom: bottomNavPadding }]}>
-        <TouchableOpacity
-          style={[styles.navTab, activeTab === 'EXPENSES' && styles.navTabActive]}
-          onPress={() => setActiveTab('EXPENSES')}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name={activeTab === 'EXPENSES' ? 'receipt' : 'receipt-outline'}
-            size={22}
-            color={activeTab === 'EXPENSES' ? '#059669' : '#64748B'}
-          />
-          <Text
-            style={[styles.navTabText, activeTab === 'EXPENSES' && styles.navTabTextActive]}
-          >
-            Expenses
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.navTab, activeTab === 'INFLOW_SAVINGS' && styles.navTabActive]}
-          onPress={() => setActiveTab('INFLOW_SAVINGS')}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name={activeTab === 'INFLOW_SAVINGS' ? 'trending-up' : 'trending-up-outline'}
-            size={22}
-            color={activeTab === 'INFLOW_SAVINGS' ? '#059669' : '#64748B'}
-          />
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === 'INFLOW_SAVINGS' && styles.navTabTextActive,
-            ]}
-          >
-            Money In & Savings
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* QR Scanner Viewfinder Modal */}
       <ScanModal
@@ -691,9 +692,10 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 14,
-    elevation: 8,
+    elevation: 12,
+    zIndex: 999,
   },
   dockPillSide: {
     flex: 1,
@@ -774,8 +776,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    paddingTop: 10,
-    paddingBottom: 16,
+    paddingTop: 8,
     paddingHorizontal: 20,
   },
   navTab: {
