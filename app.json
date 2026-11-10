@@ -40,6 +40,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/money-map"
+    },
     "updates": {
       "url": "https://u.expo.dev/085b61cc-743b-4f8a-ab21-b7467c5375a1"
     },
