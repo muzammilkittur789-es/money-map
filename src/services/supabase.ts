@@ -522,9 +522,15 @@ export async function joinFamilyGroupByCode(
 
     if (error || !groupData) return null;
 
+    // Ensure joining members never hijack user_1 (reserved for Household Admin)
+    let memberId = joiningUser.id;
+    if (!memberId || memberId === 'user_1') {
+      memberId = 'user_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+    }
+
     // Add user to family_members table in cloud as MEMBER (never override existing HEAD)
     await supabase.from('family_members').upsert({
-      id: joiningUser.id,
+      id: memberId,
       family_group_id: groupData.id,
       name: joiningUser.name,
       avatar: 'default',

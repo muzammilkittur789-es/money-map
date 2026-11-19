@@ -35,6 +35,7 @@ import {
   getDeviceMemberId,
   leaveFamilyGroup,
   saveFamilyGroup,
+  switchActiveMemberProfile,
   syncFamilyGroupFromCloud,
   updateCurrentUserName,
   updateFamilyInviteCode,
@@ -204,6 +205,30 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
     onUpdateGroup(res.group);
     setEditingMyName(false);
     Alert.alert('Profile Updated 👤', `Your name is now set to "${res.user.name}".`);
+  };
+
+  const handleSwitchProfile = (member: FamilyMember) => {
+    Alert.alert(
+      'Switch Identity',
+      `Are you ${member.name}? Switch this device to act as ${member.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, I am ' + member.name,
+          onPress: async () => {
+            await switchActiveMemberProfile(member);
+            if (member.role === 'HEAD') {
+              const devId = await getDeviceId();
+              await forceTakeoverAdminSession(group.id, devId, member.name, group.adminCode || 'FAM78699');
+              setIsAdmin(true);
+            }
+            const freshGroup = await syncFamilyGroupFromCloud(group.id);
+            if (freshGroup) onUpdateGroup(freshGroup);
+            Alert.alert('Identity Set', `This phone is now active as ${member.name}${member.role === 'HEAD' ? ' (Admin)' : ''}.`);
+          },
+        },
+      ]
+    );
   };
 
   const handleSaveInviteCode = async () => {
@@ -926,6 +951,16 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                                 >
                                   <Ionicons name="pencil" size={11} color="#2563EB" />
                                   <Text style={styles.changeMyNameBtnText}>Change Name</Text>
+                                </TouchableOpacity>
+                              )}
+                              {/* Option to switch to this profile if this is someone else */}
+                              {!isCurrent && (
+                                <TouchableOpacity
+                                  style={styles.switchProfileBtn}
+                                  onPress={() => handleSwitchProfile(member)}
+                                >
+                                  <Ionicons name="person" size={11} color="#059669" />
+                                  <Text style={styles.switchProfileBtnText}>This is Me</Text>
                                 </TouchableOpacity>
                               )}
                             </View>
@@ -1868,6 +1903,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#2563EB',
+  },
+  switchProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  switchProfileBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
   },
   memberActionsRight: {
     flexDirection: 'row',

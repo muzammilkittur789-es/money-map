@@ -125,7 +125,18 @@ export async function initializeStorage(): Promise<{
         if (parsed.name) {
           CURRENT_USER.name = parsed.name;
         }
+        if (parsed.role) {
+          CURRENT_USER.role = parsed.role;
+        }
       } catch {}
+    }
+
+    // Auto-heal admin device identity:
+    // If device is user_1, it belongs to Household Admin Muzammil
+    if (CURRENT_USER.id === 'user_1') {
+      CURRENT_USER.name = 'Muzammil';
+      CURRENT_USER.role = 'HEAD';
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(CURRENT_USER));
     }
 
     const isInit = await AsyncStorage.getItem(STORAGE_KEYS.INITIALIZED);
@@ -348,6 +359,18 @@ export async function syncFamilyGroupFromCloud(familyGroupId: string): Promise<F
         members: cloudGroup.members.length > 0 ? cloudGroup.members : [CURRENT_USER],
       };
 
+      // Keep local CURRENT_USER synchronized with cloud profile
+      const myMember = cloudGroup.members.find((m) => m.id === CURRENT_USER.id);
+      if (myMember) {
+        CURRENT_USER.name = myMember.name;
+        CURRENT_USER.role = myMember.role;
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(CURRENT_USER));
+      } else if (CURRENT_USER.id === 'user_1') {
+        CURRENT_USER.name = 'Muzammil';
+        CURRENT_USER.role = 'HEAD';
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(CURRENT_USER));
+      }
+
       await AsyncStorage.setItem(STORAGE_KEYS.FAMILY_GROUP, JSON.stringify(mergedGroup));
       return mergedGroup;
     }
@@ -416,6 +439,29 @@ export async function addFamilyMember(member: FamilyMember): Promise<FamilyGroup
   await saveFamilyGroup(updatedGroup);
   await syncFamilyGroupToCloud(updatedGroup);
   return updatedGroup;
+}
+
+export async function switchActiveMemberProfile(member: FamilyMember): Promise<FamilyMember> {
+  CURRENT_USER.id = member.id;
+  CURRENT_USER.name = member.name;
+  CURRENT_USER.role = member.role;
+  CURRENT_USER.avatar = member.avatar || 'default';
+  CURRENT_USER.color = member.color || '#059669';
+  CURRENT_USER.isCurrentUser = true;
+
+  await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_MEMBER_ID, member.id);
+  await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(CURRENT_USER));
+
+  // Also update local family group members isCurrentUser flag
+  const group = await getFamilyGroup();
+  const updatedMembers = group.members.map((m) => ({
+    ...m,
+    isCurrentUser: m.id === member.id,
+  }));
+  const updatedGroup = { ...group, members: updatedMembers };
+  await saveFamilyGroup(updatedGroup);
+
+  return CURRENT_USER;
 }
 
 export async function deleteFamilyMember(memberId: string): Promise<FamilyGroup> {
