@@ -916,7 +916,7 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
                     <View key={member.id} style={styles.memberCard}>
                       <View style={styles.memberLeft}>
                         <MemberAvatar size={40} />
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
                           {isCurrent && editingMyName ? (
                             <View style={styles.inlineNameEditRow}>
                               <TextInput
@@ -1437,12 +1437,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F5F9',
     borderRadius: 14,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    overflow: 'hidden',
   },
   memberLeft: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginRight: 10,
   },
   avatarBg: {
     width: 40,
@@ -1924,12 +1929,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   deleteMemberBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     justifyContent: 'center',
     alignItems: 'center',
   },
