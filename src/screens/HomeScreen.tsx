@@ -17,6 +17,7 @@ import {
   Expense,
   ExpenseScope,
   FamilyGroup,
+  FamilyMember,
   InflowItem,
   ParsedUpiData,
   PaymentMode,
@@ -65,6 +66,8 @@ export const HomeScreen: React.FC = () => {
   // Filters
   const [currentScope, setCurrentScope] = useState<ExpenseScope>('FAMILY');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('MONTH');
+  const [personalSpendFilter, setPersonalSpendFilter] = useState<'ALL' | 'FAMILY' | 'PERSONAL'>('ALL');
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
 
   // Modals
   const [scanModalVisible, setScanModalVisible] = useState(false);
@@ -163,33 +166,79 @@ export const HomeScreen: React.FC = () => {
     return true; // ALL
   };
 
-  // Filter expenses
-  const filteredExpenses = expenses.filter((item) => {
-    if (currentScope === 'PERSONAL') {
-      if (item.scope !== 'PERSONAL' || item.spentBy.id !== CURRENT_USER.id) {
-        return false;
-      }
-    } else {
-      if (item.scope !== 'FAMILY') {
-        return false;
-      }
-    }
-    return isWithinTimeFilter(item.date, timeFilter);
-  });
+  // User identity matching helper
+  const isPaidByMe = (spentBy?: FamilyMember) => {
+    if (!spentBy) return false;
+    if (spentBy.id && CURRENT_USER.id && spentBy.id === CURRENT_USER.id) return true;
+    if (spentBy.name && CURRENT_USER.name && spentBy.name.trim().toLowerCase() === CURRENT_USER.name.trim().toLowerCase()) return true;
+    return false;
+  };
 
-  // Filter inflows
-  const filteredInflows = inflows.filter((item) => {
-    if (currentScope === 'PERSONAL') {
-      if (item.scope !== 'PERSONAL' || item.receivedBy.id !== CURRENT_USER.id) {
-        return false;
-      }
+  const isReceivedByMe = (receivedBy?: FamilyMember) => {
+    if (!receivedBy) return false;
+    if (receivedBy.id && CURRENT_USER.id && receivedBy.id === CURRENT_USER.id) return true;
+    if (receivedBy.name && CURRENT_USER.name && receivedBy.name.trim().toLowerCase() === CURRENT_USER.name.trim().toLowerCase()) return true;
+    return false;
+  };
+
+  // Base expenses filtered by active time period
+  const timeFilteredExpenses = expenses.filter((item) => isWithinTimeFilter(item.date, timeFilter));
+
+  // 1. My Personal Spends: All expenses paid by CURRENT_USER (both Family pool contributions & Private personal)
+  const myExpensesInPeriod = timeFilteredExpenses.filter((item) => isPaidByMe(item.spentBy));
+  const mySpentOnFamily = myExpensesInPeriod.filter((item) => item.scope === 'FAMILY');
+  const myPrivateSpends = myExpensesInPeriod.filter((item) => item.scope === 'PERSONAL');
+
+  const mySpentOnFamilyAmount = mySpentOnFamily.reduce((sum, item) => sum + item.amount, 0);
+  const myPrivateAmount = myPrivateSpends.reduce((sum, item) => sum + item.amount, 0);
+  const myTotalSpentAmount = mySpentOnFamilyAmount + myPrivateAmount;
+
+  // 2. Family Pool: All expenses where item.scope === 'FAMILY'
+  const familyExpensesInPeriod = timeFilteredExpenses.filter((item) => item.scope === 'FAMILY');
+  const familyTotalAmount = familyExpensesInPeriod.reduce((sum, item) => sum + item.amount, 0);
+
+  // Household Member Contributions for Family Pool
+  const memberSpending = (familyGroup?.members || []).map((m) => {
+    const memberItems = familyExpensesInPeriod.filter(
+      (item) => item.spentBy?.id === m.id || 
+      (item.spentBy?.name && m.name && item.spentBy.name.trim().toLowerCase() === m.name.trim().toLowerCase())
+    );
+    const amount = memberItems.reduce((sum, i) => sum + i.amount, 0);
+    const count = memberItems.length;
+    const pct = familyTotalAmount > 0 ? Math.round((amount / familyTotalAmount) * 100) : 0;
+    return {
+      member: m,
+      amount,
+      count,
+      pct,
+    };
+  }).sort((a, b) => b.amount - a.amount);
+
+  // Active filtered expenses to display in the list
+  let filteredExpenses: Expense[] = [];
+  if (currentScope === 'PERSONAL') {
+    if (personalSpendFilter === 'FAMILY') {
+      filteredExpenses = mySpentOnFamily;
+    } else if (personalSpendFilter === 'PERSONAL') {
+      filteredExpenses = myPrivateSpends;
     } else {
-      if (item.scope !== 'FAMILY') {
-        return false;
-      }
+      filteredExpenses = myExpensesInPeriod;
     }
-    return isWithinTimeFilter(item.date, timeFilter);
-  });
+  } else {
+    if (selectedFamilyMemberId) {
+      filteredExpenses = familyExpensesInPeriod.filter(
+        (item) => item.spentBy?.id === selectedFamilyMemberId || 
+        (item.spentBy?.name && familyGroup?.members.find(m => m.id === selectedFamilyMemberId)?.name.trim().toLowerCase() === item.spentBy.name.trim().toLowerCase())
+      );
+    } else {
+      filteredExpenses = familyExpensesInPeriod;
+    }
+  }
+
+  // Active filtered inflows: strictly for individual
+  const filteredInflows = inflows.filter(
+    (item) => isReceivedByMe(item.receivedBy) && isWithinTimeFilter(item.date, timeFilter)
+  );
 
   // Calculate stats
   const totalExpenseAmount = filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
@@ -300,7 +349,11 @@ export const HomeScreen: React.FC = () => {
       {/* Top Header with Scope Switcher & Time Filter */}
       <Header
         currentScope={currentScope}
-        onScopeChange={setCurrentScope}
+        onScopeChange={(newScope) => {
+          setCurrentScope(newScope);
+          setPersonalSpendFilter('ALL');
+          setSelectedFamilyMemberId(null);
+        }}
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
         familyName={familyGroup.name}
@@ -323,6 +376,14 @@ export const HomeScreen: React.FC = () => {
             scope={currentScope}
             monthlyBudget={familyGroup.monthlyBudget}
             periodLabel={getPeriodLabel()}
+            myTotalSpentAmount={myTotalSpentAmount}
+            mySpentOnFamilyAmount={mySpentOnFamilyAmount}
+            myPrivateAmount={myPrivateAmount}
+            personalSpendFilter={personalSpendFilter}
+            onPersonalSpendFilterChange={setPersonalSpendFilter}
+            memberSpending={memberSpending}
+            selectedFamilyMemberId={selectedFamilyMemberId}
+            onSelectFamilyMemberId={setSelectedFamilyMemberId}
           />
 
           {/* Itemized Order & Invoice Banner */}
@@ -356,7 +417,15 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.transactionsHeader}>
             <View>
               <Text style={styles.transactionsTitle}>
-                {currentScope === 'FAMILY' ? 'Family Expenses' : 'My Personal Spends'}
+                {currentScope === 'FAMILY'
+                  ? selectedFamilyMemberId
+                    ? `${familyGroup.members.find((m) => m.id === selectedFamilyMemberId)?.name || 'Member'}'s Family Spends`
+                    : 'Family Pool Expenses'
+                  : personalSpendFilter === 'FAMILY'
+                  ? 'Paid for Family'
+                  : personalSpendFilter === 'PERSONAL'
+                  ? 'My Private Spends'
+                  : 'All My Spends'}
               </Text>
               <Text style={styles.transactionsCount}>{filteredExpenses.length} entries</Text>
             </View>
@@ -404,12 +473,16 @@ export const HomeScreen: React.FC = () => {
         <InflowSavingsView
           inflows={filteredInflows}
           totalInflow={totalInflowAmount}
-          totalExpense={totalExpenseAmount}
+          totalExpense={currentScope === 'PERSONAL' ? myTotalSpentAmount : totalExpenseAmount}
           scope={currentScope}
           periodLabel={getPeriodLabel()}
           members={familyGroup.members}
           onDeleteInflow={handleDeleteInflow}
           onOpenAddInflow={() => setAddInflowVisible(true)}
+          mySpentOnFamilyAmount={mySpentOnFamilyAmount}
+          myPrivateAmount={myPrivateAmount}
+          memberSpending={memberSpending}
+          familyTotalSpent={familyTotalAmount}
         />
       )}
 
@@ -539,6 +612,7 @@ export const HomeScreen: React.FC = () => {
           setExpenses([]);
           setInflows([]);
         }}
+        expenses={expenses}
       />
 
       {/* Itemized Order & Invoice Scanner Modal */}

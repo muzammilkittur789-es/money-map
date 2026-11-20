@@ -42,7 +42,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<InflowCategory>('Salary');
   const [channel, setChannel] = useState<InflowChannel>('BANK_UPI');
-  const [scope, setScope] = useState<ExpenseScope>('FAMILY');
+  const [scope, setScope] = useState<ExpenseScope>('PERSONAL');
   const [selectedRecipient, setSelectedRecipient] = useState<FamilyMember>(currentUser);
   const [notes, setNotes] = useState('');
   const [inflowDate, setInflowDate] = useState<Date>(new Date());
@@ -53,7 +53,7 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
       setAmount('');
       setCategory('Salary');
       setChannel('BANK_UPI');
-      setScope('FAMILY');
+      setScope('PERSONAL');
       setSelectedRecipient(currentUser);
       setInflowDate(new Date());
     }
@@ -156,53 +156,16 @@ export const AddInflowModal: React.FC<AddInflowModalProps> = ({
               label="Date Received"
             />
 
-            {/* Scope: Personal vs Family */}
-            <View style={styles.fieldSection}>
-              <Text style={styles.sectionLabel}>Where does this money go?</Text>
-              <View style={styles.scopeButtonGroup}>
-                <TouchableOpacity
-                  style={[
-                    styles.scopeOption,
-                    scope === 'PERSONAL' && styles.scopeOptionActivePersonal,
-                  ]}
-                  onPress={() => setScope('PERSONAL')}
-                >
-                  <Ionicons
-                    name="person"
-                    size={16}
-                    color={scope === 'PERSONAL' ? '#FFFFFF' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.scopeOptionText,
-                      scope === 'PERSONAL' && styles.scopeOptionTextActive,
-                    ]}
-                  >
-                    Personal (Private)
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.scopeOption,
-                    scope === 'FAMILY' && styles.scopeOptionActiveFamily,
-                  ]}
-                  onPress={() => setScope('FAMILY')}
-                >
-                  <Ionicons
-                    name="people"
-                    size={16}
-                    color={scope === 'FAMILY' ? '#FFFFFF' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.scopeOptionText,
-                      scope === 'FAMILY' && styles.scopeOptionTextActive,
-                    ]}
-                  >
-                    Family Pool
-                  </Text>
-                </TouchableOpacity>
+            {/* Individual Inflow Notice */}
+            <View style={styles.individualInflowBanner}>
+              <View style={styles.individualInflowIconBg}>
+                <Ionicons name="lock-closed" size={14} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.individualInflowTitle}>Individual Income & Inflow</Text>
+                <Text style={styles.individualInflowSub}>
+                  Credited directly to {selectedRecipient.name || 'your'} private ledger for personal net savings tracking.
+                </Text>
               </View>
             </View>
 
@@ -486,6 +449,35 @@ const styles = StyleSheet.create({
   scopeOptionTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  individualInflowBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    gap: 10,
+    marginBottom: 16,
+  },
+  individualInflowIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  individualInflowTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  individualInflowSub: {
+    fontSize: 11,
+    color: '#047857',
+    marginTop: 1,
   },
   modeButtonGroup: {
     flexDirection: 'row',

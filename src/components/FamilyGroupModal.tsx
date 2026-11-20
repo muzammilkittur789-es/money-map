@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { FamilyGroup, FamilyMember } from '../types';
+import { Expense, FamilyGroup, FamilyMember } from '../types';
 import {
   claimAdminSession,
   forceTakeoverAdminSession,
@@ -51,6 +51,7 @@ interface FamilyGroupModalProps {
   group: FamilyGroup;
   onUpdateGroup: (group: FamilyGroup) => void;
   onRecordsCleared?: () => void;
+  expenses?: Expense[];
 }
 
 export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
@@ -59,12 +60,34 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
   group,
   onUpdateGroup,
   onRecordsCleared,
+  expenses = [],
 }) => {
   const [groupName, setGroupName] = useState(group.name);
   const [budget, setBudget] = useState(group.monthlyBudget.toString());
   const [newMemberName, setNewMemberName] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Household Spending Breakdown by Member (Only for Family Pool expenses)
+  const familyExpenses = (expenses || []).filter((e) => e.scope === 'FAMILY');
+  const totalFamilySpent = familyExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const memberSpendingBreakdown = group.members.map((member) => {
+    const memberItems = familyExpenses.filter(
+      (e) =>
+        e.spentBy?.id === member.id ||
+        (e.spentBy?.name && member.name && e.spentBy.name.trim().toLowerCase() === member.name.trim().toLowerCase())
+    );
+    const amount = memberItems.reduce((sum, e) => sum + e.amount, 0);
+    const count = memberItems.length;
+    const pct = totalFamilySpent > 0 ? Math.round((amount / totalFamilySpent) * 100) : 0;
+    return {
+      member,
+      amount,
+      count,
+      pct,
+    };
+  }).sort((a, b) => b.amount - a.amount);
 
   // Admin permissions state (Universal mutex lock)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -846,6 +869,50 @@ export const FamilyGroupModal: React.FC<FamilyGroupModalProps> = ({
               )}
             </View>
 
+            {/* Household Member Spending Breakdown */}
+            {group.id !== 'solo_group' && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionLabel}>Household Spending by Member</Text>
+                  <View style={styles.spendingTotalPill}>
+                    <Text style={styles.spendingTotalPillText}>
+                      Pool: ₹{totalFamilySpent.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.spendingBreakdownCard}>
+                  {memberSpendingBreakdown.map(({ member, amount, count, pct }) => (
+                    <View key={member.id} style={styles.spendingBreakdownRow}>
+                      <MemberAvatar size={34} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={styles.spendingMemberName} numberOfLines={1}>
+                            {member.name} {member.isCurrentUser || member.id === CURRENT_USER.id ? '(You)' : ''}
+                          </Text>
+                          <Text style={styles.spendingMemberAmount}>
+                            ₹{amount.toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                        <View style={styles.spendingBarBg}>
+                          <View
+                            style={[
+                              styles.spendingBarFill,
+                              { width: `${pct}%`, backgroundColor: member.color || '#059669' },
+                            ]}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                          <Text style={styles.spendingMemberSub}>{pct}% of household spend</Text>
+                          <Text style={styles.spendingMemberSub}>{count} expenses logged</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Members List */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
@@ -1321,6 +1388,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  spendingTotalPill: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  spendingTotalPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  spendingBreakdownCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  spendingBreakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  spendingMemberName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  spendingMemberAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  spendingBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  spendingBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  spendingMemberSub: {
+    fontSize: 10,
+    color: '#64748B',
   },
   sectionLabel: {
     fontSize: 12,
