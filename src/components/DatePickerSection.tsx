@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,9 +29,15 @@ export const DatePickerSection: React.FC<DatePickerSectionProps> = ({
   label = 'TRANSACTION DATE',
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
-  const [currentViewDate, setCurrentViewDate] = useState(new Date(value));
+  const [currentViewDate, setCurrentViewDate] = useState(new Date(value || new Date()));
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
+
+  useEffect(() => {
+    if (value) {
+      setCurrentViewDate(new Date(value));
+    }
+  }, [value]);
 
   const now = new Date();
   const isToday =

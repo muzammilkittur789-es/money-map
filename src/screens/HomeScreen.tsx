@@ -38,6 +38,7 @@ import {
 } from '../services/storage';
 import { subscribeToFamilyUpdates } from '../services/supabase';
 import { generateAndSharePdfReport } from '../utils/pdfGenerator';
+import { groupExpensesByDate } from '../utils/dateFormatter';
 import { Header } from '../components/Header';
 import { StatSummary } from '../components/StatSummary';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
@@ -143,18 +144,24 @@ export const HomeScreen: React.FC = () => {
   // Date filtering helper
   const isWithinTimeFilter = (isoDate: string, filter: TimeFilter): boolean => {
     const itemDate = new Date(isoDate);
+    if (isNaN(itemDate.getTime())) return true;
     const now = new Date();
 
     if (filter === 'TODAY') {
-      return (
+      const isSameLocalDay =
         itemDate.getDate() === now.getDate() &&
         itemDate.getMonth() === now.getMonth() &&
-        itemDate.getFullYear() === now.getFullYear()
-      );
+        itemDate.getFullYear() === now.getFullYear();
+
+      // Buffer: also include today from 00:00:00 up to tomorrow noon (handles timezone/midnight roll)
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfTodayWithBuffer = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12, 0, 0, 0);
+
+      return isSameLocalDay || (itemDate >= startOfToday && itemDate <= endOfTodayWithBuffer);
     } else if (filter === 'WEEK') {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(now.getDate() - 7);
-      return itemDate >= oneWeekAgo && itemDate <= now;
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0);
+      const endOfTodayWithBuffer = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12, 0, 0, 0);
+      return itemDate >= startOfWeek && itemDate <= endOfTodayWithBuffer;
     } else if (filter === 'MONTH') {
       return (
         itemDate.getMonth() === now.getMonth() &&
@@ -235,10 +242,16 @@ export const HomeScreen: React.FC = () => {
     }
   }
 
-  // Active filtered inflows: strictly for individual
-  const filteredInflows = inflows.filter(
-    (item) => isReceivedByMe(item.receivedBy) && isWithinTimeFilter(item.date, timeFilter)
-  );
+  // ALWAYS sort expenses descending by date (newest first)
+  filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Group sorted expenses by date section ("TODAY", "YESTERDAY", "18 NOV 2026", etc.)
+  const groupedExpenses = groupExpensesByDate(filteredExpenses);
+
+  // Active filtered inflows: strictly for individual (newest first)
+  const filteredInflows = inflows
+    .filter((item) => isReceivedByMe(item.receivedBy) && isWithinTimeFilter(item.date, timeFilter))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Calculate stats
   const totalExpenseAmount = filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
@@ -457,12 +470,38 @@ export const HomeScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.transactionsList}>
-              {filteredExpenses.map((expense) => (
-                <ExpenseCard
-                  key={expense.id}
-                  expense={expense}
-                  onDelete={handleDeleteExpense}
-                />
+              {groupedExpenses.map((group) => (
+                <View key={group.title} style={styles.dateGroupContainer}>
+                  <View style={styles.dateGroupHeaderRow}>
+                    <View style={styles.dateGroupBadge}>
+                      <Ionicons
+                        name={group.title === 'TODAY' ? 'today' : group.title === 'YESTERDAY' ? 'time' : 'calendar-outline'}
+                        size={12}
+                        color={group.title === 'TODAY' ? '#059669' : '#64748B'}
+                      />
+                      <Text
+                        style={[
+                          styles.dateGroupHeaderText,
+                          group.title === 'TODAY' && styles.dateGroupHeaderTextToday,
+                        ]}
+                      >
+                        {group.title}
+                      </Text>
+                    </View>
+                    <Text style={styles.dateGroupHeaderSub}>
+                      ₹{group.total.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.dateGroupCards}>
+                    {group.items.map((expense) => (
+                      <ExpenseCard
+                        key={expense.id}
+                        expense={expense}
+                        onDelete={handleDeleteExpense}
+                      />
+                    ))}
+                  </View>
+                </View>
               ))}
             </View>
           )}
@@ -728,6 +767,38 @@ const styles = StyleSheet.create({
   },
   transactionsList: {
     paddingHorizontal: 20,
+  },
+  dateGroupContainer: {
+    marginBottom: 16,
+  },
+  dateGroupHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  dateGroupBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dateGroupHeaderText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.6,
+  },
+  dateGroupHeaderTextToday: {
+    color: '#059669',
+  },
+  dateGroupHeaderSub: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  dateGroupCards: {
+    gap: 10,
   },
   emptyCard: {
     marginHorizontal: 20,

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { InflowItem } from '../types';
 import { getInflowCategoryMeta } from '../utils/inflowCategories';
 import { MemberAvatar } from './MemberAvatar';
+import { formatExpenseDateTime } from '../utils/dateFormatter';
 
 interface InflowCardProps {
   inflow: InflowItem;
@@ -12,13 +13,7 @@ interface InflowCardProps {
 
 export const InflowCard: React.FC<InflowCardProps> = ({ inflow, onDelete }) => {
   const meta = getInflowCategoryMeta(inflow.category);
-
-  const formattedDate = new Date(inflow.date).toLocaleDateString('en-IN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedDate = formatExpenseDateTime(inflow.date);
 
   const confirmDelete = () => {
     Alert.alert(

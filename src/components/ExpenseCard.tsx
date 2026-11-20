@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Expense } from '../types';
 import { getCategoryMeta } from '../utils/categories';
 import { MemberAvatar } from './MemberAvatar';
+import { formatExpenseDateTime } from '../utils/dateFormatter';
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -12,13 +13,7 @@ interface ExpenseCardProps {
 
 export const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onDelete }) => {
   const meta = getCategoryMeta(expense.category);
-
-  const formattedDate = new Date(expense.date).toLocaleDateString('en-IN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedDate = formatExpenseDateTime(expense.date);
 
   const confirmDelete = () => {
     Alert.alert(
