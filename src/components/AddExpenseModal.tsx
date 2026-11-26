@@ -49,7 +49,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('Groceries');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>(defaultMode);
-  const [upiProvider, setUpiProvider] = useState<UpiProvider>('PHONEPE');
+  const [upiProvider, setUpiProvider] = useState<UpiProvider>('GENERIC_UPI');
   const [scope, setScope] = useState<ExpenseScope>('FAMILY');
   const [selectedSpender, setSelectedSpender] = useState<FamilyMember>(currentUser);
   const [notes, setNotes] = useState('');
@@ -59,6 +59,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   useEffect(() => {
     if (visible) {
       setExpenseDate(new Date());
+      setUpiProvider('GENERIC_UPI');
       if (scannedData) {
         setTitle(scannedData.payeeName || 'UPI Merchant');
         if (scannedData.amount) {
@@ -119,8 +120,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         scannedData.payeeUpiId,
         scannedData.payeeName,
         parsedAmount,
-        notes || expenseTitle,
-        upiProvider
+        notes.trim() || undefined,
+        upiProvider,
+        scannedData.rawParams,
+        scannedData.rawUrl
       );
     }
 
@@ -349,10 +352,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <View style={styles.providerRow}>
                   {(
                     [
+                      { id: 'GENERIC_UPI', label: 'Default / Any App', icon: 'flash', color: '#0F766E' },
                       { id: 'PHONEPE', label: 'PhonePe', icon: 'wallet-outline', color: '#6739B7' },
                       { id: 'GPAY', label: 'Google Pay', icon: 'logo-google', color: '#1A73E8' },
                       { id: 'PAYTM', label: 'Paytm', icon: 'card-outline', color: '#00BAF2' },
-                      { id: 'GENERIC_UPI', label: 'Any UPI', icon: 'flash-outline', color: '#0F172A' },
                     ] as const
                   ).map((prov) => {
                     const isSelected = upiProvider === prov.id;

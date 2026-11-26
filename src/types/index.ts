@@ -86,6 +86,7 @@ export interface ParsedUpiData {
   currency: string;
   merchantCode?: string;
   suggestedCategory?: ExpenseCategory;
+  rawParams?: Record<string, string>;
   rawUrl: string;
 }
 
